@@ -1,0 +1,155 @@
+version: '3.8'
+
+services:
+  # Vaultwarden (Bitwarden-compatible server)
+  bitwarden:
+    image: vaultwarden/server:latest
+    container_name: codialog_bitwarden
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "3012:3012"
+    environment:
+      - WEBSOCKET_ENABLED=true
+      - SENDS_ALLOWED=true
+      - PASSWORD_ITERATIONS=100000
+      - SHOW_PASSWORD_HINT=false
+      - DOMAIN=http://localhost:8080
+      - ADMIN_TOKEN=${BITWARDEN_ADMIN_TOKEN}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      - RUST_LOG=warn
+    volumes:
+      - bitwarden_data:/data
+      - ./bitwarden/config:/config
+    depends_on:
+      - postgres
+    networks:
+      - codialog_network
+
+  # PostgreSQL database for Bitwarden
+  postgres:
+    image: postgres:15-alpine
+    container_name: codialog_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - codialog_network
+
+  # Redis for session management
+  redis:
+    image: redis:7-alpine
+    container_name: codialog_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - codialog_network
+
+  # Bitwarden CLI helper service
+  bitwarden-cli:
+    image: bitwarden/cli:latest
+    container_name: codialog_bw_cli
+    restart: unless-stopped
+    environment:
+      - BW_SERVE=true
+      - BW_SERVER=http://bitwarden
+    volumes:
+      - bw_cli_data:/home/node/.config/Bitwarden CLI
+    networks:
+      - codialog_network
+    depends_on:
+      - bitwarden
+    command: ['sh', '-c', 'bw serve --hostname 0.0.0.0 --port 8087']
+    ports:
+      - "8087:8087"
+
+  # Codialog main application
+  codialog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codialog_app
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:1420"
+      - "${API_PORT}:4000"
+    environment:
+      - RUST_LOG=${RUST_LOG}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - BITWARDEN_SERVER=http://bitwarden
+      - BITWARDEN_CLI_SERVER=http://bitwarden-cli:8087
+    volumes:
+      - codialog_data:/app/data
+      - codialog_uploads:/app/uploads
+      - codialog_logs:/app/logs
+      - codialog_sessions:/app/sessions
+      - ./scripts:/app/scripts:ro
+    depends_on:
+      - bitwarden
+      - postgres
+      - redis
+      - bitwarden-cli
+    networks:
+      - codialog_network
+
+volumes:
+  bitwarden_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/bitwarden
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/redis
+  bw_cli_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/bitwarden-cli
+  codialog_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/app
+  codialog_uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/uploads
+  codialog_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/logs
+  codialog_sessions:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/sessions
+
+networks:
+  codialog_network:
+    driver: bridge

@@ -1,6 +1,6 @@
 use std::path::Path;
-use tracing::{info, warn, error, debug};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing::{info, error};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

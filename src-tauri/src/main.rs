@@ -7,6 +7,8 @@ mod cdp;
 mod tagui;
 mod llm;
 mod logging;
+mod bitwarden;
+mod session;
 
 use axum::{
     routing::{get, post},
@@ -18,14 +20,22 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, warn, error, debug};
+use tracing::{info, error, warn};
 use logging::LogManager;
+use bitwarden::{BitwardenManager, BitwardenCredential};
+use session::{SessionManager, UserSession, UserData};
 use std::collections::HashMap;
+use sqlx::PgPool;
+use redis::Client as RedisClient;
+use anyhow::{Result, Context};
 
 #[derive(Clone)]
 struct AppState {
     webview_url: Arc<Mutex<String>>,
     log_manager: Arc<LogManager>,
+    bitwarden_manager: Arc<Mutex<BitwardenManager>>,
+    session_manager: Arc<SessionManager>,
+    db_pool: PgPool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -61,6 +71,37 @@ struct LogResponse {
     success: bool,
     logs: Option<Vec<String>>,
     stats: Option<serde_json::Value>,
+    error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct BitwardenLoginRequest {
+    email: String,
+    master_password: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct BitwardenUnlockRequest {
+    master_password: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SessionRequest {
+    user_id: String,
+    user_data: UserData,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SessionResponse {
+    success: bool,
+    session: Option<UserSession>,
+    error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CredentialsResponse {
+    success: bool,
+    credentials: Option<Vec<BitwardenCredential>>,
     error: Option<String>,
 }
 

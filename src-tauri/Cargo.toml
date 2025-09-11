@@ -3,19 +3,22 @@ name = "codialog"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tom Sapletta <info@softreck.dev>"]
-description = "Intelligent CV automation and form filling assistant"
+description = "Intelligent CV automation and form filling assistant with secure credential management"
 license = "Apache-2.0"
+homepage = "https://github.com/codialog-com/tauri"
+repository = "https://github.com/codialog-com/tauri"
+keywords = ["automation", "bitwarden", "form-filling", "tauri", "credentials"]
 
 [build-dependencies]
 tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0", features = [] }
+tauri = { version = "2.0.0", features = ["api-all"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "stream"] }
 axum = "0.7"
 tower = "0.4"
 chromiumoxide = { version = "0.5", features = ["tokio-runtime"] }
@@ -24,6 +27,21 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 chrono = { version = "0.4", features = ["serde"] }
+# Bitwarden and credential management
+uuid = { version = "1.0", features = ["v4"] }
+base64 = "0.21"
+# Session and data persistence
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+redis = { version = "0.23", features = ["tokio-comp"] }
+# Security and encryption
+ring = "0.16"
+argon2 = "0.5"
+# Configuration management
+config = "0.13"
+dotenv = "0.15"
+# File system operations
+tempfile = "3.8"
+walkdir = "2.4"
 
 [dependencies.tauri-plugin-shell]
 version = "2.0.0"
