@@ -96,17 +96,46 @@ Dzięki `Makefile` zarządzanie środowiskiem jest proste:
 ```
 codialog/
 ├── .github/         # Workflows CI/CD (GitHub Actions)
-├── docker/          # Konfiguracja Dockerfiles dla poszczególnych usług
-├── monitoring/      # Konfiguracja Prometheus, Grafana, Loki
-├── scripts/         # Skrypty pomocnicze (np. backup, setup)
-├── src-tauri/       # Kod backendu (Rust)
-├── src/             # Kod frontendu (JavaScript, HTML, CSS)
 ├── tests/           # Wszystkie testy (unit, integration, e2e, performance)
 ├── Makefile         # Polecenia do zarządzania projektem
 ├── docker-compose.yml # Główny plik Docker Compose
-└── README.md        # Ta dokumentacja
+├── README.md        # Ta dokumentacja
+├── docker/
+│   ├── Dockerfile.app
+│   ├── Dockerfile.tagui
+│   └── Dockerfile.test
+├── src-tauri/
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── cdp.rs
+│   │   ├── tagui.rs
+│   │   └── llm.rs
+│   └── tests/
+│       ├── integration_test.rs
+│       └── unit_test.rs
+├── src/
+│   ├── index.html
+│   ├── main.js
+│   └── style.css
+├── tests/
+│   ├── e2e/
+│   │   ├── cv_upload.spec.js
+│   │   └── form_fill.spec.js
+│   ├── unit/
+│   │   ├── dsl_generator.test.js
+│   │   └── api.test.js
+│   └── fixtures/
+│       ├── test_cv.pdf
+│       └── test_form.html
+├── docker-compose.yml
+├── docker-compose.test.yml
+├── Makefile
+└── .github/
+    └── workflows/
+        └── ci.yml
+
 ```
 
 ## 📜 Licencja
 
-Projekt jest udostępniony na licencji [MIT](LICENSE).
+Projekt jest udostępniony na licencji [Apache v2](LICENSE).

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codialog - Automatyzacja CV</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Codialog - Automatyzacja CV</h1>
+            <p class="subtitle">Inteligentny asystent do automatycznego wypełniania formularzy i wysyłania aplikacji</p>
+        </header>
+        
+        <div class="section">
+            <h2>1. Dane użytkownika</h2>
+            <div class="form-group">
+                <input type="text" id="fullname" placeholder="Imię i nazwisko" required>
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="text" id="username" placeholder="Login do systemu">
+                <input type="password" id="password" placeholder="Hasło">
+                <input type="tel" id="phone" placeholder="Telefon (+48123456789)">
+                <div class="file-input-wrapper">
+                    <input type="file" id="cv-file" accept=".pdf,.doc,.docx" required>
+                    <label for="cv-file" class="file-label">📄 Wybierz plik CV</label>
+                </div>
+                <div id="cv-path" class="file-path"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>2. URL formularza</h2>
+            <div class="form-group">
+                <input type="url" id="target-url" placeholder="https://example.com/apply" required>
+                <button id="analyze-btn" class="btn btn-secondary">🔍 Analizuj stronę</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Wygenerowany skrypt DSL</h2>
+            <textarea id="dsl-script" rows="12" readonly placeholder="Skrypt DSL zostanie wygenerowany automatycznie..."></textarea>
+            <div class="button-group">
+                <button id="generate-btn" class="btn btn-primary">⚡ Generuj DSL</button>
+                <button id="run-btn" class="btn btn-success">🚀 Uruchom automatyzację</button>
+                <button id="clear-btn" class="btn btn-outline">🗑️ Wyczyść</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>4. Szablony formularzy</h2>
+            <div class="templates">
+                <button class="template-btn" data-template="job">💼 Aplikacja o pracę</button>
+                <button class="template-btn" data-template="linkedin">💼 LinkedIn Easy Apply</button>
+                <button class="template-btn" data-template="registration">📝 Rejestracja</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>5. Status</h2>
+            <div id="status" class="status">Gotowy do rozpoczęcia automatyzacji</div>
+            <div class="progress-bar">
+                <div id="progress" class="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Codialog v0.1.0 | Developed with ❤️ using Tauri + Rust</p>
+    </footer>
+
+    <script src="main.js"></script>
+</body>
+</html>

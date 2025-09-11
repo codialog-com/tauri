@@ -1,0 +1,53 @@
+// Kompleksowa aplikacja o pracę - wieloetapowy formularz
+// Typ: Zaawansowany formularz rekrutacyjny
+
+// Krok 1: Akceptacja cookies i nawigacja
+click "#accept-cookies"
+hover "#careers-link"
+click "#careers-link"
+click "#job-posting-senior-dev"
+click "#apply-now"
+
+// Krok 2: Dane osobowe
+type "#first-name" "Jan"
+type "#last-name" "Kowalski"
+type "#email" "jan.kowalski@example.com"
+type "#phone" "+48123456789"
+type "#city" "Warszawa"
+type "#country" "Polska"
+
+// Krok 3: Doświadczenie zawodowe
+click "#experience-5plus"
+type "#current-position" "Senior Software Developer"
+type "#current-company" "Tech Solutions Sp. z o.o."
+type "#salary-expectations" "15000-20000 PLN"
+
+// Krok 4: Umiejętności techniczne
+click "#skill-javascript"
+click "#skill-react"
+click "#skill-nodejs"
+click "#skill-python"
+click "#skill-docker"
+
+// Krok 5: Upload dokumentów
+upload "#resume" "C:/Users/Jan/Documents/CV.pdf"
+upload "#cover-letter" "C:/Users/Jan/Documents/List_Motywacyjny.pdf"
+upload "#portfolio" "C:/Users/Jan/Documents/Portfolio.pdf"
+
+// Krok 6: Dodatkowe informacje
+type "#linkedin" "https://linkedin.com/in/jankowalski"
+type "#github" "https://github.com/jankowalski"
+type "#website" "https://jankowalski.dev"
+
+// Krok 7: Preferencje pracy
+click "#remote-work-yes"
+click "#start-date-asap"
+type "#additional-info" "Jestem gotowy na nowe wyzwania i chętnie dołączę do zespołu."
+
+// Krok 8: Zgody i wysłanie
+click "#gdpr-consent"
+click "#marketing-consent"
+click "#submit-application"
+
+// Potwierdzenie
+click "#confirm-submit"

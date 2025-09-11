@@ -1,0 +1,33 @@
+// LinkedIn Easy Apply - automatyzacja aplikacji na LinkedIn
+// Typ: LinkedIn Easy Apply
+
+// Logowanie do LinkedIn
+click "#sign-in"
+type "#username" "jan.kowalski@example.com"
+type "#password" "LinkedInPassword123!"
+click "#sign-in-submit"
+
+// Znajdź i kliknij przycisk Easy Apply
+hover ".jobs-search-results__list-item"
+click ".jobs-apply-button"
+
+// Wypełnij podstawowe informacje
+type "#phoneNumber" "+48123456789"
+type "#linkedinProfile" "https://linkedin.com/in/jankowalski"
+
+// Upload CV jeśli wymagane
+upload "#resume-upload" "C:/Users/Jan/Documents/CV_LinkedIn.pdf"
+
+// Dodatkowe pytania (przykładowe)
+click "#experience-level-mid"
+type "#salary-expectations" "10000-15000 PLN"
+type "#availability" "2 weeks notice"
+
+// Śledź firmę (opcjonalne)
+click "#follow-company"
+
+// Wyślij aplikację
+click "#submit-application"
+
+// Potwierdź wysłanie
+click "#confirm-submit"

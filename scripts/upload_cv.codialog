@@ -1,0 +1,22 @@
+// Minimalny skrypt do uploadu CV
+// Typ: Podstawowa aplikacja o pracę
+
+// Akceptuj cookies jeśli wymagane
+click "#accept-cookies"
+
+// Logowanie do systemu (jeśli wymagane)
+click "#login-btn"
+type "#username" "jan.kowalski"
+type "#password" "SuperTajneHaslo!"
+click "#submit"
+
+// Wypełnij dane osobowe
+type "#fullname" "Jan Kowalski"
+type "#email" "jan.kowalski@example.com"
+type "#phone" "+48123456789"
+
+// Upload pliku CV
+upload "#cv-upload" "C:/Users/Jan/Documents/CV.pdf"
+
+// Wyślij aplikację
+click "#apply-submit"

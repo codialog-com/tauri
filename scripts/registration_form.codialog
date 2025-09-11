@@ -1,0 +1,37 @@
+// Automatyczna rejestracja na stronie internetowej
+// Typ: Formularz rejestracyjny
+
+// Przejdź do formularza rejestracji
+click "#register-link"
+
+// Wypełnij dane rejestracyjne
+type "#username" "jankowalski"
+type "#email" "jan.kowalski@example.com"
+type "#password" "SecurePassword123!"
+type "#confirm-password" "SecurePassword123!"
+
+// Dane osobowe
+type "#first-name" "Jan"
+type "#last-name" "Kowalski"
+type "#date-of-birth" "1990-05-15"
+type "#phone" "+48123456789"
+
+// Adres
+type "#street" "ul. Nowa 123"
+type "#city" "Warszawa"
+type "#postal-code" "00-001"
+type "#country" "Polska"
+
+// Zgody
+click "#terms-checkbox"
+click "#privacy-checkbox"
+click "#newsletter-checkbox"
+
+// Weryfikacja (jeśli wymagana)
+click "#captcha-checkbox"
+
+// Wyślij formularz
+click "#create-account"
+
+// Potwierdź rejestrację jeśli wymagane
+click "#confirm-registration"
