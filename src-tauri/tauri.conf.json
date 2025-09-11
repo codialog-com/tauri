@@ -5,7 +5,6 @@
   "identifier": "com.codialog.app",
   "build": {
     "beforeDevCommand": "",
-    "devUrl": "../src",
     "beforeBuildCommand": "",
     "frontendDist": "../src"
   },
@@ -17,10 +16,7 @@
         "height": 800,
         "resizable": true,
         "fullscreen": false,
-        "alwaysOnTop": false,
-        "webviewWindow": {
-          "devtools": true
-        }
+        "alwaysOnTop": false
       }
     ],
     "security": {

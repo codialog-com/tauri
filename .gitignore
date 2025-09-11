@@ -5,6 +5,7 @@ venv
 .env
 npm
 node_modules
+Cargo.lock
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

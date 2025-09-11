@@ -1,6 +1,6 @@
 use chromiumoxide::Browser;
 use futures::StreamExt;
-use tracing::{info, error, debug};
+use tracing::{info, debug};
 
 pub async fn get_page_html(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     info!("Fetching HTML content from URL: {}", url);

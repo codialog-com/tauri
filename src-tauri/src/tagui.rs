@@ -168,9 +168,7 @@ mod tests {
 
     #[test]
     fn test_validate_dsl_script() {
-        let valid_script = r#"click "#button"
-type "#input" "text"
-upload "#file" "path/to/file.pdf""#;
+        let valid_script = "click \"#button\"\ntype \"#input\" \"text\"\nupload \"#file\" \"path/to/file.pdf\"";
         
         assert!(validate_dsl_script(valid_script).is_ok());
         

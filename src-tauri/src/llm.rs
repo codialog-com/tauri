@@ -191,17 +191,7 @@ pub mod templates {
         let phone = user_data.get("phone").and_then(|v| v.as_str()).unwrap_or("");
         let cv_path = user_data.get("cv_path").and_then(|v| v.as_str()).unwrap_or("");
         
-        format!(r#"click "#accept-cookies"
-hover "#careers-link"
-click "#careers-link"
-click "#apply-now"
-type "#first-name" "{}"
-type "#last-name" "{}"
-type "#email" "{}"
-type "#phone" "{}"
-upload "#resume" "{}"
-click "#gdpr-consent"
-click "#submit-application""#, first_name, last_name, email, phone, cv_path)
+        format!("click \"#accept-cookies\"\nhover \"#careers-link\"\nclick \"#careers-link\"\nclick \"#apply-now\"\ntype \"#first-name\" \"{}\"\ntype \"#last-name\" \"{}\"\ntype \"#email\" \"{}\"\ntype \"#phone\" \"{}\"\nupload \"#resume\" \"{}\"\nclick \"#gdpr-consent\"\nclick \"#submit-application\"", first_name, last_name, email, phone, cv_path)
     }
 
     pub fn registration_template(user_data: &serde_json::Value) -> String {
@@ -209,13 +199,7 @@ click "#submit-application""#, first_name, last_name, email, phone, cv_path)
         let email = user_data.get("email").and_then(|v| v.as_str()).unwrap_or("");
         let password = user_data.get("password").and_then(|v| v.as_str()).unwrap_or("");
         
-        format!(r#"click "#register"
-type "#username" "{}"
-type "#email" "{}"
-type "#password" "{}"
-type "#confirm-password" "{}"
-click "#terms-checkbox"
-click "#create-account""#, username, email, password, password)
+        format!("click \"#register\"\ntype \"#username\" \"{}\"\ntype \"#email\" \"{}\"\ntype \"#password\" \"{}\"\ntype \"#confirm-password\" \"{}\"\nclick \"#terms-checkbox\"\nclick \"#create-account\"", username, email, password, password)
     }
 
     pub fn linkedin_apply_template(user_data: &serde_json::Value) -> String {
@@ -224,15 +208,7 @@ click "#create-account""#, username, email, password, password)
         let phone = user_data.get("phone").and_then(|v| v.as_str()).unwrap_or("");
         let cv_path = user_data.get("cv_path").and_then(|v| v.as_str()).unwrap_or("");
         
-        format!(r#"click "#sign-in"
-type "#username" "{}"
-type "#password" "{}"
-click "#sign-in-submit"
-click ".jobs-apply-button"
-upload "#resume-upload" "{}"
-type "#phone" "{}"
-click "#follow-company"
-click "#submit-application""#, email, password, cv_path, phone)
+        format!("click \"#sign-in\"\ntype \"#username\" \"{}\"\ntype \"#password\" \"{}\"\nclick \"#sign-in-submit\"\nclick \".jobs-apply-button\"\nupload \"#resume-upload\" \"{}\"\ntype \"#phone\" \"{}\"\nclick \"#follow-company\"\nclick \"#submit-application\"", email, password, cv_path, phone)
     }
 }
 
@@ -281,17 +257,17 @@ mod tests {
     
     #[test]
     fn test_parse_dsl_from_response() {
-        let llm_response = r#"
+        let llm_response = "
         Here's the DSL script for your form:
         
-        click "#login-btn"
-        type "#username" "testuser"
-        type "#password" "testpass"
+        click \"#login-btn\"
+        type \"#username\" \"testuser\"
+        type \"#password\" \"testpass\"
         // This is a comment
-        click "#submit"
+        click \"#submit\"
         
         This should work for your form.
-        "#;
+        ";
         
         let parsed = parse_dsl_from_response(llm_response);
         let lines: Vec<&str> = parsed.lines().collect();

@@ -7,7 +7,6 @@ mod cdp;
 mod tagui;
 mod llm;
 
-use tauri::Manager;
 use axum::{
     routing::{get, post},
     Router,
