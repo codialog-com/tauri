@@ -40,14 +40,8 @@ pub async fn generate_dsl_script_with_cache(html: &str, user_data: &Value, db_po
         warn!("Invalid user data format, using empty data for DSL generation");
     }
     
-    // Create cache key with error handling
-    let cache_key = match create_cache_key(html, user_data) {
-        Ok(key) => key,
-        Err(e) => {
-            error!("Failed to create cache key: {}, proceeding without cache", e);
-            format!("fallback_{}", html.len())
-        }
-    };
+    // Create cache key
+    let cache_key = create_cache_key(html, user_data);
     
     // Try to get cached script first with retry logic
     if let Some(pool) = db_pool {

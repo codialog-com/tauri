@@ -568,11 +568,9 @@ async fn initialize_database() -> Result<PgPool> {
         .await
         .context("Failed to connect to database")?;
     
-    // Run migrations
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .context("Failed to run database migrations")?;
+    // Database migrations would be handled by Docker initialization
+    // or manual migration scripts for production deployment
+    info!("Database connection established, migrations handled externally");
     
     info!("Database initialized successfully");
     Ok(pool)
