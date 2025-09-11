@@ -2,9 +2,8 @@ use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use std::process::Command;
 use anyhow::{Result, Context};
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, error};
 use tokio::time::{timeout, Duration};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BitwardenCredential {

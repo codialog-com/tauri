@@ -287,7 +287,8 @@ impl FormAnalyzer {
     
     fn analyze_elements(&mut self) {
         // Parse HTML to find form elements (simplified parser)
-        let lines: Vec<&str> = self.html.lines().collect();
+        let html_content = self.html.clone();
+        let lines: Vec<&str> = html_content.lines().collect();
         
         for line in lines {
             if line.contains("<input") {

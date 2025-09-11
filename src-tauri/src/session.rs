@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use redis::AsyncCommands;
 use anyhow::{Result, Context};
-use tracing::{info, warn, error, debug};
+use tracing::{info, debug};
 use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 use std::collections::HashMap;
