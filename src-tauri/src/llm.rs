@@ -3,10 +3,9 @@ use reqwest;
 use tracing::{info, error, debug, warn};
 use crate::tagui::escape_for_dsl;
 use sqlx::PgPool;
-use chrono::{DateTime, Utc};
-use anyhow::{Result, Context};
+use chrono::Utc;
+use anyhow::Result;
 use std::collections::HashMap;
-use std::time::Duration;
 
 pub async fn generate_dsl_script(html: &str, user_data: &Value) -> String {
     generate_dsl_script_with_cache(html, user_data, None).await
@@ -132,7 +131,7 @@ async fn cache_dsl_script(pool: &PgPool, cache_key: &str, script: &str, html: &s
         hasher.finish()
     });
     
-    sqlx::query!(
+    sqlx::query(
         "INSERT INTO dsl_scripts_cache (cache_key, script_content, html_hash, created_at, expires_at)
          VALUES ($1, $2, $3, NOW(), $4)
          ON CONFLICT (cache_key) 
@@ -140,12 +139,12 @@ async fn cache_dsl_script(pool: &PgPool, cache_key: &str, script: &str, html: &s
            script_content = EXCLUDED.script_content,
            html_hash = EXCLUDED.html_hash,
            created_at = NOW(),
-           expires_at = EXCLUDED.expires_at",
-        cache_key,
-        script,
-        html_hash,
-        expires_at
+           expires_at = EXCLUDED.expires_at"
     )
+    .bind(cache_key)
+    .bind(script)
+    .bind(html_hash)
+    .bind(expires_at)
     .execute(pool)
     .await?;
     

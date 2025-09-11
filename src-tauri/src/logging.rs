@@ -1,11 +1,14 @@
 use std::path::Path;
-use tracing::{info, error};
+use tracing::{info, error, debug};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs;
 use std::io::Result as IoResult;
+use sqlx::PgPool;
+use anyhow::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -227,3 +230,51 @@ macro_rules! log_debug {
 }
 
 use std::io::Write;
+
+/// Log system event to database for analytics and monitoring
+pub async fn log_system_event(
+    pool: &PgPool,
+    component: &str,
+    level: &str,
+    data: &Value,
+) -> Result<()> {
+    debug!(
+        component = component,
+        level = level,
+        "Logging system event to database"
+    );
+
+    sqlx::query(
+        "INSERT INTO system_logs (component, level, data, created_at) 
+         VALUES ($1, $2, $3, NOW())"
+    )
+    .bind(component)
+    .bind(level)
+    .bind(data)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Get logs by component from database
+pub async fn get_logs_by_component(
+    pool: &PgPool,
+    component: &str,
+    limit: Option<i32>,
+) -> Result<Vec<Value>> {
+    let limit = limit.unwrap_or(100);
+    
+    let rows = sqlx::query_as::<_, (Value,)>(
+        "SELECT data FROM system_logs 
+         WHERE component = $1 
+         ORDER BY created_at DESC 
+         LIMIT $2"
+    )
+    .bind(component)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|row| row.0).collect())
+}
