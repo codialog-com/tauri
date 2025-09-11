@@ -236,6 +236,198 @@ async fn clear_logs(
     }
 }
 
+// Endpoint do logowania się do Bitwarden
+async fn bitwarden_login(
+    Json(payload): Json<BitwardenLoginRequest>,
+    State(state): State<AppState>,
+) -> Json<SessionResponse> {
+    info!("Bitwarden login attempt for user: {}", payload.email);
+    
+    let mut bitwarden = state.bitwarden_manager.lock().await;
+    
+    match bitwarden.login(&payload.email, &payload.master_password).await {
+        Ok(()) => {
+            info!("Bitwarden login successful for: {}", payload.email);
+            
+            // Utwórz sesję użytkownika
+            let user_data = UserData::default();
+            match state.session_manager.create_session(&payload.email, user_data).await {
+                Ok(session) => {
+                    Json(SessionResponse {
+                        success: true,
+                        session: Some(session),
+                        error: None,
+                    })
+                }
+                Err(e) => {
+                    error!("Failed to create session: {}", e);
+                    Json(SessionResponse {
+                        success: false,
+                        session: None,
+                        error: Some(format!("Failed to create session: {}", e)),
+                    })
+                }
+            }
+        }
+        Err(e) => {
+            error!("Bitwarden login failed: {}", e);
+            Json(SessionResponse {
+                success: false,
+                session: None,
+                error: Some(format!("Bitwarden login failed: {}", e)),
+            })
+        }
+    }
+}
+
+// Endpoint do odblokowywania Bitwarden vault
+async fn bitwarden_unlock(
+    Json(payload): Json<BitwardenUnlockRequest>,
+    State(state): State<AppState>,
+) -> Json<serde_json::Value> {
+    info!("Bitwarden vault unlock attempt");
+    
+    let mut bitwarden = state.bitwarden_manager.lock().await;
+    
+    match bitwarden.unlock(&payload.master_password).await {
+        Ok(()) => {
+            info!("Bitwarden vault unlocked successfully");
+            Json(serde_json::json!({
+                "success": true,
+                "message": "Vault unlocked successfully"
+            }))
+        }
+        Err(e) => {
+            error!("Failed to unlock Bitwarden vault: {}", e);
+            Json(serde_json::json!({
+                "success": false,
+                "error": format!("Failed to unlock vault: {}", e)
+            }))
+        }
+    }
+}
+
+// Endpoint do pobierania wszystkich danych logowania
+async fn get_credentials(
+    State(state): State<AppState>,
+) -> Json<CredentialsResponse> {
+    info!("Retrieving all credentials from Bitwarden");
+    
+    let bitwarden = state.bitwarden_manager.lock().await;
+    
+    match bitwarden.get_all_credentials().await {
+        Ok(credentials) => {
+            info!("Retrieved {} credentials", credentials.len());
+            Json(CredentialsResponse {
+                success: true,
+                credentials: Some(credentials),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!("Failed to retrieve credentials: {}", e);
+            Json(CredentialsResponse {
+                success: false,
+                credentials: None,
+                error: Some(format!("Failed to retrieve credentials: {}", e)),
+            })
+        }
+    }
+}
+
+// Endpoint do pobierania danych logowania dla konkretnej strony
+async fn get_credentials_for_url(
+    Query(params): Query<HashMap<String, String>>,
+    State(state): State<AppState>,
+) -> Json<CredentialsResponse> {
+    let url = params.get("url").cloned().unwrap_or_default();
+    info!("Retrieving credentials for URL: {}", url);
+    
+    let bitwarden = state.bitwarden_manager.lock().await;
+    
+    match bitwarden.get_credentials_for_url(&url).await {
+        Ok(credentials) => {
+            info!("Found {} credentials for URL: {}", credentials.len(), url);
+            Json(CredentialsResponse {
+                success: true,
+                credentials: Some(credentials),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!("Failed to retrieve credentials for URL: {}", e);
+            Json(CredentialsResponse {
+                success: false,
+                credentials: None,
+                error: Some(format!("Failed to retrieve credentials: {}", e)),
+            })
+        }
+    }
+}
+
+// Endpoint do tworzenia/aktualizacji sesji użytkownika
+async fn create_session(
+    Json(payload): Json<SessionRequest>,
+    State(state): State<AppState>,
+) -> Json<SessionResponse> {
+    info!("Creating session for user: {}", payload.user_id);
+    
+    match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
+        Ok(session) => {
+            info!("Session created successfully: {}", session.session_id);
+            Json(SessionResponse {
+                success: true,
+                session: Some(session),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!("Failed to create session: {}", e);
+            Json(SessionResponse {
+                success: false,
+                session: None,
+                error: Some(format!("Failed to create session: {}", e)),
+            })
+        }
+    }
+}
+
+// Endpoint do pobierania sesji
+async fn get_session(
+    Query(params): Query<HashMap<String, String>>,
+    State(state): State<AppState>,
+) -> Json<SessionResponse> {
+    let session_id = params.get("session_id").cloned().unwrap_or_default();
+    info!("Retrieving session: {}", session_id);
+    
+    match state.session_manager.get_session(&session_id).await {
+        Ok(Some(session)) => {
+            info!("Session found: {}", session_id);
+            Json(SessionResponse {
+                success: true,
+                session: Some(session),
+                error: None,
+            })
+        }
+        Ok(None) => {
+            warn!("Session not found: {}", session_id);
+            Json(SessionResponse {
+                success: false,
+                session: None,
+                error: Some("Session not found or expired".to_string()),
+            })
+        }
+        Err(e) => {
+            error!("Failed to retrieve session: {}", e);
+            Json(SessionResponse {
+                success: false,
+                session: None,
+                error: Some(format!("Failed to retrieve session: {}", e)),
+            })
+        }
+    }
+}
+
 #[tauri::command]
 async fn load_url(url: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
     info!("Loading URL: {}", url);
@@ -244,7 +436,30 @@ async fn load_url(url: String, state: tauri::State<'_, AppState>) -> Result<(), 
     Ok(())
 }
 
+async fn initialize_database() -> Result<PgPool> {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgresql://codialog:password@localhost:5432/codialog".to_string());
+    
+    info!("Connecting to database: {}", database_url);
+    
+    let pool = PgPool::connect(&database_url)
+        .await
+        .context("Failed to connect to database")?;
+    
+    // Run migrations
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .context("Failed to run database migrations")?;
+    
+    info!("Database initialized successfully");
+    Ok(pool)
+}
+
 fn main() {
+    // Load environment variables
+    dotenv::dotenv().ok();
+    
     // Initialize advanced logging system
     let log_manager = Arc::new(LogManager::new("logs"));
     
@@ -253,28 +468,75 @@ fn main() {
         std::process::exit(1);
     }
     
-    info!("🚀 Starting Codialog application...");
+    info!("🚀 Starting Codialog application with Bitwarden integration...");
     info!("Advanced logging system initialized");
+    
+    // Stwórz Tokio runtime
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    
+    // Initialize database and Redis connections
+    let (db_pool, redis_client, bitwarden_manager, session_manager) = rt.block_on(async {
+        // Initialize database
+        let db_pool = initialize_database().await
+            .expect("Failed to initialize database");
+        
+        // Initialize Redis
+        let redis_url = std::env::var("REDIS_URL")
+            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_client = RedisClient::open(redis_url)
+            .expect("Failed to create Redis client");
+        
+        // Initialize Bitwarden manager
+        let bitwarden_server = std::env::var("BITWARDEN_SERVER")
+            .unwrap_or_else(|_| "http://localhost:8080".to_string());
+        let bitwarden_cli_server = std::env::var("BITWARDEN_CLI_SERVER")
+            .unwrap_or_else(|_| "http://localhost:8087".to_string());
+            
+        let mut bitwarden_manager = BitwardenManager::new(bitwarden_server, bitwarden_cli_server);
+        if let Err(e) = bitwarden_manager.initialize().await {
+            warn!("Failed to initialize Bitwarden manager: {}", e);
+        }
+        
+        // Initialize session manager
+        let session_manager = SessionManager::new(db_pool.clone(), redis_client.clone());
+        if let Err(e) = session_manager.initialize().await {
+            error!("Failed to initialize session manager: {}", e);
+            std::process::exit(1);
+        }
+        
+        (db_pool, redis_client, bitwarden_manager, session_manager)
+    });
     
     let app_state = AppState {
         webview_url: Arc::new(Mutex::new(String::new())),
         log_manager: log_manager.clone(),
+        bitwarden_manager: Arc::new(Mutex::new(bitwarden_manager)),
+        session_manager: Arc::new(session_manager),
+        db_pool,
     };
 
-    // Stwórz Tokio runtime
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    
     // Uruchom serwer HTTP w tle
     let state_clone = app_state.clone();
     rt.spawn(async move {
         let app = Router::new()
+            // Health and system endpoints
             .route("/health", get(health))
+            // DSL and automation endpoints  
             .route("/dsl/generate", post(generate_dsl))
             .route("/rpa/run", post(run_tagui))
             .route("/page/analyze", get(analyze_page))
+            // Logging endpoints
             .route("/logs", get(get_logs))
             .route("/logs/stats", get(get_log_stats))
             .route("/logs/clear", post(clear_logs))
+            // Bitwarden endpoints
+            .route("/bitwarden/login", post(bitwarden_login))
+            .route("/bitwarden/unlock", post(bitwarden_unlock))
+            .route("/bitwarden/credentials", get(get_credentials))
+            .route("/bitwarden/credentials/url", get(get_credentials_for_url))
+            // Session management endpoints
+            .route("/session/create", post(create_session))
+            .route("/session/get", get(get_session))
             .with_state(state_clone);
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:4000")
