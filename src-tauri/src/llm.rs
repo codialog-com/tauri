@@ -2,21 +2,54 @@ use serde_json::Value;
 use reqwest;
 use tracing::{info, error, debug, warn};
 use crate::tagui::escape_for_dsl;
+use sqlx::PgPool;
+use chrono::{DateTime, Utc};
+use anyhow::Result;
+use std::collections::HashMap;
 
 pub async fn generate_dsl_script(html: &str, user_data: &Value) -> String {
+    generate_dsl_script_with_cache(html, user_data, None).await
+}
+
+pub async fn generate_dsl_script_with_cache(html: &str, user_data: &Value, db_pool: Option<&PgPool>) -> String {
     info!("Generating DSL script from HTML and user data");
     
-    // Sprawdź czy to jest złożony formularz - jeśli tak, użyj LLM
-    if is_complex_form(html) {
-        if let Ok(llm_script) = generate_dsl_with_llm(html, user_data).await {
-            if !llm_script.is_empty() {
-                return llm_script;
-            }
+    // Create cache key from HTML and user data hash
+    let cache_key = create_cache_key(html, user_data);
+    
+    // Try to get cached script first
+    if let Some(pool) = db_pool {
+        if let Ok(Some(cached_script)) = get_cached_dsl_script(pool, &cache_key).await {
+            info!("Using cached DSL script for key: {}", cache_key);
+            return cached_script;
         }
     }
     
-    // Fallback do prostej logiki parsowania HTML
-    generate_simple_dsl(html, user_data)
+    // Generate new script
+    let script = if is_complex_form(html) {
+        // Try LLM first for complex forms
+        if let Ok(llm_script) = generate_dsl_with_llm(html, user_data).await {
+            if !llm_script.is_empty() {
+                llm_script
+            } else {
+                generate_enhanced_dsl(html, user_data)
+            }
+        } else {
+            generate_enhanced_dsl(html, user_data)
+        }
+    } else {
+        // Use enhanced logic for simple forms
+        generate_enhanced_dsl(html, user_data)
+    };
+    
+    // Cache the generated script
+    if let Some(pool) = db_pool {
+        if let Err(e) = cache_dsl_script(pool, &cache_key, &script, html).await {
+            warn!("Failed to cache DSL script: {}", e);
+        }
+    }
+    
+    script
 }
 
 fn generate_simple_dsl(html: &str, user_data: &Value) -> String {
