@@ -328,15 +328,97 @@ function handleFileUpload(event) {
         
         // Display file path (Tauri provides file path)
         const path = file.path || `${getDefaultDocumentsPath()}/${file.name}`;
-        document.getElementById('cv-path').textContent = `📄 Wybrany plik: ${file.name}`;
-        document.getElementById('cv-path').dataset.path = path;
+        const cvPathElement = document.getElementById('cv-path');
+        if (cvPathElement) {
+            cvPathElement.textContent = `📄 Wybrany plik: ${file.name}`;
+            cvPathElement.dataset.path = path;
+        }
         
         // Update file label
         const label = document.querySelector('.file-label');
-        label.textContent = `📄 ${file.name}`;
-        label.classList.add('file-selected');
+        if (label) {
+            label.textContent = `📄 ${file.name}`;
+            label.classList.add('file-selected');
+        }
         
         showStatus('✅ Plik CV został wybrany', 'success');
+        
+        // Auto-save session
+        saveUserSession();
+    }
+}
+
+async function refreshBitwardenCredentials() {
+    if (appState.bitwardenStatus !== 'unlocked') {
+        showStatus('❌ Najpierw odblokuj sejf Bitwarden', 'error');
+        return;
+    }
+    
+    setProcessing(true);
+    showStatus('🔄 Pobieranie danych uwierzytelniających...', 'info');
+    
+    try {
+        const response = await fetch(`${API_URL}/bitwarden/credentials`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            appState.credentials = data.credentials || [];
+            displayCredentials(appState.credentials);
+            showStatus('✅ Dane uwierzytelniające pobrane', 'success');
+        } else {
+            const error = await response.json();
+            showStatus(`❌ Błąd pobierania: ${error.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Credentials fetch error:', error);
+        showStatus('❌ Błąd pobierania danych', 'error');
+    } finally {
+        setProcessing(false);
+    }
+}
+
+async function handleBitwardenLogout() {
+    if (confirm('🚪 Czy na pewno chcesz się wylogować z Bitwarden?')) {
+        appState.bitwardenStatus = 'logged-out';
+        appState.credentials = [];
+        updateBitwardenUI();
+        displayCredentials([]);
+        showStatus('👋 Wylogowano z Bitwarden', 'info');
+    }
+}
+
+function updateBitwardenUI() {
+    const loginForm = document.getElementById('bw-login-form');
+    const unlockForm = document.getElementById('bw-unlock-form');
+    const vaultContent = document.getElementById('bw-vault-content');
+    const statusBadge = document.getElementById('bw-status');
+    
+    if (!loginForm || !unlockForm || !vaultContent || !statusBadge) return;
+    
+    // Update status badge
+    statusBadge.className = `status-badge ${appState.bitwardenStatus}`;
+    
+    switch (appState.bitwardenStatus) {
+        case 'logged-out':
+            statusBadge.textContent = 'Wylogowany';
+            loginForm.style.display = 'block';
+            unlockForm.style.display = 'none';
+            vaultContent.style.display = 'none';
+            break;
+            
+        case 'locked':
+            statusBadge.textContent = 'Zablokowany';
+            loginForm.style.display = 'none';
+            unlockForm.style.display = 'block';
+            vaultContent.style.display = 'none';
+            break;
+            
+        case 'unlocked':
+            statusBadge.textContent = 'Odblokowany';
+            loginForm.style.display = 'none';
+            unlockForm.style.display = 'none';
+            vaultContent.style.display = 'block';
+            break;
     }
 }
 
@@ -349,6 +431,101 @@ function getDefaultDocumentsPath() {
         return '/Users/User/Documents';
     } else {
         return '/home/user/Documents';
+    }
+}
+
+// Display credentials in the vault
+function displayCredentials(credentials) {
+    const container = document.getElementById('bw-credentials-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (credentials.length === 0) {
+        container.innerHTML = '<div class="empty-state">Brak danych uwierzytelniających</div>';
+        return;
+    }
+    
+    credentials.forEach(credential => {
+        const credentialCard = document.createElement('div');
+        credentialCard.className = 'credential-card';
+        credentialCard.innerHTML = `
+            <div class="credential-header">
+                <h4>${escapeHtml(credential.name || 'Bez nazwy')}</h4>
+                <div class="credential-actions">
+                    <button class="btn-icon" onclick="useCredential('${credential.id}')" title="Użyj danych">
+                        <span>📋</span>
+                    </button>
+                    <button class="btn-icon" onclick="copyToClipboard('${credential.password || ''}')" title="Kopiuj hasło">
+                        <span>🔑</span>
+                    </button>
+                </div>
+            </div>
+            <div class="credential-details">
+                <div class="credential-field">
+                    <label>Email/Login:</label>
+                    <span>${escapeHtml(credential.login || 'Brak')}</span>
+                </div>
+                <div class="credential-field">
+                    <label>URL:</label>
+                    <span>${escapeHtml(credential.url || 'Brak')}</span>
+                </div>
+                <div class="credential-field">
+                    <label>Notatki:</label>
+                    <span>${escapeHtml(credential.notes || 'Brak')}</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(credentialCard);
+    });
+}
+
+// Filter credentials based on search input
+function filterCredentials() {
+    const searchTerm = document.getElementById('bw-search').value.toLowerCase().trim();
+    
+    if (!searchTerm) {
+        displayCredentials(appState.credentials);
+        return;
+    }
+    
+    const filtered = appState.credentials.filter(credential => 
+        (credential.name && credential.name.toLowerCase().includes(searchTerm)) ||
+        (credential.login && credential.login.toLowerCase().includes(searchTerm)) ||
+        (credential.url && credential.url.toLowerCase().includes(searchTerm))
+    );
+    
+    displayCredentials(filtered);
+}
+
+// Use credential to fill form
+async function useCredential(credentialId) {
+    const credential = appState.credentials.find(c => c.id === credentialId);
+    if (!credential) return;
+    
+    // Fill dashboard form if on dashboard tab
+    if (appState.activeTab === 'dashboard') {
+        const emailField = document.getElementById('email');
+        const usernameField = document.getElementById('username');
+        const passwordField = document.getElementById('password');
+        
+        if (emailField && credential.login) {
+            emailField.value = credential.login;
+        }
+        if (usernameField && credential.login) {
+            usernameField.value = credential.login;
+        }
+        if (passwordField && credential.password) {
+            passwordField.value = credential.password;
+        }
+        
+        // Auto-save session
+        saveUserSession();
+        
+        showNotification(`✅ Użyto danych: ${credential.name}`, 'success');
+        
+        // Switch to dashboard tab
+        showTab('dashboard');
     }
 }
 
@@ -386,13 +563,17 @@ async function analyzePage() {
         }
         
         const data = await response.json();
-        currentPageHTML = data.html || '';
+        appState.currentPageHTML = data.html || '';
         
         updateProgress(100);
         showStatus('✅ Strona przeanalizowana pomyślnie', 'success');
         
         // Enable generate button
-        document.getElementById('generate-btn').disabled = false;
+        const generateBtn = document.getElementById('generate-btn');
+        if (generateBtn) generateBtn.disabled = false;
+        
+        // Auto-save session
+        saveUserSession();
         
     } catch (error) {
         console.error('Analysis error:', error);
@@ -403,9 +584,160 @@ async function analyzePage() {
     }
 }
 
+// Logging Panel Functions
+async function refreshLogs() {
+    setProcessing(true);
+    showStatus('📋 Pobieranie logów...', 'info');
+    
+    try {
+        const response = await fetch(`${API_URL}/logs/get`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            appState.logs = data.logs || [];
+            displayLogs(appState.logs);
+            updateLogStatistics();
+            showStatus('✅ Logi odświeżone', 'success');
+        } else {
+            showStatus('❌ Błąd pobierania logów', 'error');
+        }
+    } catch (error) {
+        console.error('Logs fetch error:', error);
+        showStatus('❌ Błąd połączenia z serwerem logów', 'error');
+    } finally {
+        setProcessing(false);
+    }
+}
+
+async function clearLogs() {
+    if (confirm('🗑️ Czy na pewno chcesz wyczyścić wszystkie logi?')) {
+        try {
+            const response = await fetch(`${API_URL}/logs/clear`, { method: 'POST' });
+            
+            if (response.ok) {
+                appState.logs = [];
+                displayLogs([]);
+                updateLogStatistics();
+                showStatus('✅ Logi wyczyszczone', 'success');
+            } else {
+                showStatus('❌ Błąd czyszczenia logów', 'error');
+            }
+        } catch (error) {
+            console.error('Clear logs error:', error);
+            showStatus('❌ Błąd czyszczenia logów', 'error');
+        }
+    }
+}
+
+function updateLogFilters() {
+    const levelFilter = document.getElementById('log-level-filter');
+    const componentFilter = document.getElementById('log-component-filter');
+    const searchInput = document.getElementById('log-search');
+    
+    appState.logFilters = {
+        level: levelFilter?.value || 'all',
+        component: componentFilter?.value || 'all',
+        search: searchInput?.value?.toLowerCase().trim() || ''
+    };
+    
+    const filteredLogs = filterLogs(appState.logs);
+    displayLogs(filteredLogs);
+}
+
+function filterLogs(logs) {
+    return logs.filter(log => {
+        // Filter by level
+        if (appState.logFilters.level !== 'all' && log.level !== appState.logFilters.level) {
+            return false;
+        }
+        
+        // Filter by component
+        if (appState.logFilters.component !== 'all' && log.component !== appState.logFilters.component) {
+            return false;
+        }
+        
+        // Filter by search term
+        if (appState.logFilters.search) {
+            const searchTerm = appState.logFilters.search;
+            const searchableText = `${log.message} ${log.component}`.toLowerCase();
+            if (!searchableText.includes(searchTerm)) {
+                return false;
+            }
+        }
+        
+        return true;
+    });
+}
+
+// Display logs in the logging panel
+function displayLogs(logs) {
+    const container = document.getElementById('log-entries');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (logs.length === 0) {
+        container.innerHTML = '<div class="empty-state">Brak logów do wyświetlenia</div>';
+        return;
+    }
+    
+    logs.reverse().forEach(log => {
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${log.level}`;
+        
+        const timestamp = new Date(log.timestamp).toLocaleString('pl-PL');
+        
+        logEntry.innerHTML = `
+            <div class="log-header">
+                <span class="log-level">${log.level.toUpperCase()}</span>
+                <span class="log-component">${escapeHtml(log.component)}</span>
+                <span class="log-timestamp">${timestamp}</span>
+            </div>
+            <div class="log-message">${escapeHtml(log.message)}</div>
+        `;
+        
+        container.appendChild(logEntry);
+    });
+    
+    // Auto-scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+function updateLogStatistics() {
+    const stats = {
+        total: appState.logs.length,
+        error: appState.logs.filter(l => l.level === 'error').length,
+        warn: appState.logs.filter(l => l.level === 'warn').length,
+        info: appState.logs.filter(l => l.level === 'info').length,
+        debug: appState.logs.filter(l => l.level === 'debug').length
+    };
+    
+    const statsContainer = document.getElementById('log-stats');
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <div class="stat-item">
+                <span class="stat-label">Łącznie:</span>
+                <span class="stat-value">${stats.total}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Błędy:</span>
+                <span class="stat-value stat-error">${stats.error}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Ostrzeżenia:</span>
+                <span class="stat-value stat-warn">${stats.warn}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Info:</span>
+                <span class="stat-value stat-info">${stats.info}</span>
+            </div>
+        `;
+    }
+}
+
 // Generate DSL script
 async function generateDSL() {
-    if (!currentPageHTML) {
+    if (!appState.currentPageHTML) {
         showStatus('❌ Najpierw przeanalizuj stronę', 'error');
         return;
     }
@@ -427,7 +759,7 @@ async function generateDSL() {
                 'Content-Type': 'application/json' 
             },
             body: JSON.stringify({
-                html: currentPageHTML,
+                html: appState.currentPageHTML,
                 user_data: userData
             })
         });
@@ -441,13 +773,18 @@ async function generateDSL() {
         const data = await response.json();
         const script = data.script || '';
         
-        document.getElementById('dsl-script').value = script;
+        const dslScript = document.getElementById('dsl-script');
+        if (dslScript) dslScript.value = script;
         
         updateProgress(100);
         showStatus('✅ Skrypt DSL wygenerowany pomyślnie', 'success');
         
         // Enable run button
-        document.getElementById('run-btn').disabled = false;
+        const runBtn = document.getElementById('run-btn');
+        if (runBtn) runBtn.disabled = false;
+        
+        // Auto-save session
+        saveUserSession();
         
     } catch (error) {
         console.error('Generation error:', error);
@@ -460,7 +797,8 @@ async function generateDSL() {
 
 // Run automation
 async function runAutomation() {
-    const script = document.getElementById('dsl-script').value.trim();
+    const dslScript = document.getElementById('dsl-script');
+    const script = dslScript?.value?.trim();
     
     if (!script) {
         showStatus('❌ Najpierw wygeneruj skrypt DSL', 'error');
@@ -503,6 +841,9 @@ async function runAutomation() {
             showStatus('⚠️ Automatyzacja zakończona z błędami', 'warning');
         }
         
+        // Auto-save session
+        saveUserSession();
+        
     } catch (error) {
         console.error('Automation error:', error);
         showStatus(`❌ Błąd wykonania: ${error.message}`, 'error');
@@ -510,6 +851,57 @@ async function runAutomation() {
     } finally {
         setProcessing(false);
     }
+}
+
+// Settings Management Functions
+function loadSettings() {
+    const savedSettings = localStorage.getItem('codialog_settings');
+    if (savedSettings) {
+        try {
+            appState.settings = { ...appState.settings, ...JSON.parse(savedSettings) };
+        } catch (error) {
+            console.error('Settings load error:', error);
+        }
+    }
+    applySettings();
+}
+
+function saveSettings() {
+    localStorage.setItem('codialog_settings', JSON.stringify(appState.settings));
+}
+
+function updateSettings() {
+    const themeSelect = document.getElementById('theme-select');
+    const autoSaveCheck = document.getElementById('auto-save-check');
+    const notificationsCheck = document.getElementById('notifications-check');
+    
+    if (themeSelect) appState.settings.theme = themeSelect.value;
+    if (autoSaveCheck) appState.settings.autoSave = autoSaveCheck.checked;
+    if (notificationsCheck) appState.settings.notifications = notificationsCheck.checked;
+    
+    saveSettings();
+    applySettings();
+    showNotification('✅ Ustawienia zapisane', 'success');
+}
+
+function applySettings() {
+    // Apply theme
+    document.body.className = `theme-${appState.settings.theme}`;
+    
+    // Apply other settings as needed
+    if (!appState.settings.notifications) {
+        // Disable notifications if needed
+    }
+}
+
+function loadSettingsUI() {
+    const themeSelect = document.getElementById('theme-select');
+    const autoSaveCheck = document.getElementById('auto-save-check');
+    const notificationsCheck = document.getElementById('notifications-check');
+    
+    if (themeSelect) themeSelect.value = appState.settings.theme;
+    if (autoSaveCheck) autoSaveCheck.checked = appState.settings.autoSave;
+    if (notificationsCheck) notificationsCheck.checked = appState.settings.notifications;
 }
 
 // Clear form
@@ -521,26 +913,150 @@ function clearForm() {
         document.getElementById('username').value = '';
         document.getElementById('password').value = '';
         document.getElementById('phone').value = '';
-        document.getElementById('target-url').value = '';
-        document.getElementById('dsl-script').value = '';
-        document.getElementById('cv-file').value = '';
-        document.getElementById('cv-path').textContent = '';
-        document.getElementById('cv-path').dataset.path = '';
+        const targetUrl = document.getElementById('target-url');
+        const dslScript = document.getElementById('dsl-script');
+        const cvFile = document.getElementById('cv-file');
+        const cvPath = document.getElementById('cv-path');
+        
+        if (targetUrl) targetUrl.value = '';
+        if (dslScript) dslScript.value = '';
+        if (cvFile) cvFile.value = '';
+        if (cvPath) {
+            cvPath.textContent = '';
+            cvPath.dataset.path = '';
+        }
         
         // Reset file label
         const label = document.querySelector('.file-label');
-        label.textContent = '📄 Wybierz plik CV';
-        label.classList.remove('file-selected');
+        if (label) {
+            label.textContent = '📄 Wybierz plik CV';
+            label.classList.remove('file-selected');
+        }
         
         // Reset state
-        currentPageHTML = '';
+        appState.currentPageHTML = '';
         updateProgress(0);
         showStatus('✨ Formularz został wyczyszczony', 'info');
         
         // Disable buttons
-        document.getElementById('generate-btn').disabled = true;
-        document.getElementById('run-btn').disabled = true;
+        const generateBtn = document.getElementById('generate-btn');
+        const runBtn = document.getElementById('run-btn');
+        if (generateBtn) generateBtn.disabled = true;
+        if (runBtn) runBtn.disabled = true;
+        
+        // Auto-save session
+        saveUserSession();
     }
+}
+
+// Utility Functions
+function collectUserData() {
+    const fullnameField = document.getElementById('fullname');
+    const emailField = document.getElementById('email');
+    const usernameField = document.getElementById('username');
+    const passwordField = document.getElementById('password');
+    const phoneField = document.getElementById('phone');
+    const cvPathField = document.getElementById('cv-path');
+    
+    return {
+        fullname: fullnameField?.value?.trim() || '',
+        email: emailField?.value?.trim() || '',
+        username: usernameField?.value?.trim() || '',
+        password: passwordField?.value?.trim() || '',
+        phone: phoneField?.value?.trim() || '',
+        cv_path: cvPathField?.dataset?.path || ''
+    };
+}
+
+function restoreFormData(userData) {
+    if (!userData) return;
+    
+    const fullnameField = document.getElementById('fullname');
+    const emailField = document.getElementById('email');
+    const usernameField = document.getElementById('username');
+    const passwordField = document.getElementById('password');
+    const phoneField = document.getElementById('phone');
+    
+    if (fullnameField && userData.fullname) fullnameField.value = userData.fullname;
+    if (emailField && userData.email) emailField.value = userData.email;
+    if (usernameField && userData.username) usernameField.value = userData.username;
+    if (passwordField && userData.password) passwordField.value = userData.password;
+    if (phoneField && userData.phone) phoneField.value = userData.phone;
+}
+
+function validateUserData(userData) {
+    if (!userData.fullname) {
+        showStatus('❌ Podaj imię i nazwisko', 'error');
+        return false;
+    }
+    
+    if (!userData.email || !isValidEmail(userData.email)) {
+        showStatus('❌ Podaj prawidłowy adres email', 'error');
+        return false;
+    }
+    
+    return true;
+}
+
+function isValidURL(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+function validateURL() {
+    const targetUrl = document.getElementById('target-url');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    
+    if (!targetUrl || !analyzeBtn) return;
+    
+    const url = targetUrl.value.trim();
+    analyzeBtn.disabled = !(url && isValidURL(url));
+}
+
+function validateEmail() {
+    const emailField = document.getElementById('email');
+    if (!emailField) return;
+    
+    const email = emailField.value.trim();
+    
+    emailField.classList.remove('valid', 'invalid');
+    
+    if (email && isValidEmail(email)) {
+        emailField.classList.add('valid');
+    } else if (email) {
+        emailField.classList.add('invalid');
+    }
+}
+
+// Copy to clipboard utility
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showNotification('📋 Skopiowano do schowka', 'success');
+    } catch (error) {
+        console.error('Clipboard error:', error);
+        showNotification('❌ Błąd kopiowania', 'error');
+    }
+}
+
+// HTML escaping utility
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 // Load predefined templates
@@ -586,12 +1102,107 @@ click "#create-account"`;
             break;
     }
     
-    document.getElementById('dsl-script').value = templateScript;
-    showStatus(`📋 Załadowano szablon: ${templateType}`, 'info');
-    
-    // Enable run button
-    document.getElementById('run-btn').disabled = false;
+    const dslScript = document.getElementById('dsl-script');
+    if (dslScript) {
+        dslScript.value = templateScript;
+        showStatus(`📋 Załadowano szablon: ${templateType}`, 'info');
+        
+        // Enable run button
+        const runBtn = document.getElementById('run-btn');
+        if (runBtn) runBtn.disabled = false;
+        
+        // Auto-save session
+        saveUserSession();
+    }
 }
+
+// Status and notification functions
+function showStatus(message, type) {
+    const status = document.getElementById('status');
+    if (!status) return;
+    
+    status.textContent = message;
+    status.className = `status ${type}`;
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            if (status.textContent === message) {
+                status.textContent = 'Gotowy do następnej operacji';
+                status.className = 'status';
+            }
+        }, 5000);
+    }
+}
+
+function showNotification(message, type) {
+    if (!appState.settings.notifications) return;
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    // Add to notification container or create one
+    let container = document.getElementById('notifications');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notifications';
+        container.className = 'notifications-container';
+        document.body.appendChild(container);
+    }
+    
+    container.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function updateProgress(percentage) {
+    const progressBar = document.getElementById('progress');
+    if (!progressBar) return;
+    
+    progressBar.style.width = `${percentage}%`;
+    
+    if (percentage === 0) {
+        progressBar.style.width = '0%';
+    }
+}
+
+function setProcessing(processing) {
+    appState.isProcessing = processing;
+    
+    // Disable/enable buttons during processing
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => {
+        if (processing) {
+            btn.disabled = true;
+            btn.classList.add('processing');
+        } else {
+            btn.classList.remove('processing');
+            // Re-enable based on form state
+            validateURL();
+            if (appState.currentPageHTML) {
+                const generateBtn = document.getElementById('generate-btn');
+                if (generateBtn) generateBtn.disabled = false;
+            }
+            const dslScript = document.getElementById('dsl-script');
+            if (dslScript?.value?.trim()) {
+                const runBtn = document.getElementById('run-btn');
+                if (runBtn) runBtn.disabled = false;
+            }
+        }
+    });
+}
+
+// Auto-save functionality
+setInterval(() => {
+    if (appState.settings.autoSave && !appState.isProcessing) {
+        saveUserSession();
+    }
+}, 30000); // Auto-save every 30 seconds
 
 // Utility functions
 function collectUserData() {
