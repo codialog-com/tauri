@@ -2,7 +2,7 @@ use serde_json::Value;
 use reqwest;
 use tracing::{info, error, debug, warn};
 use crate::tagui::escape_for_dsl;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use chrono::Utc;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -24,6 +24,113 @@ wait 2
 "#;
     
     script.trim().to_string()
+}
+
+async fn get_cached_dsl_script_with_retry(pool: &PgPool, cache_key: &str, retries: u32) -> Result<Option<String>> {
+    for attempt in 0..retries {
+        match sqlx::query("SELECT script_content FROM dsl_cache WHERE cache_key = $1 AND expires_at > NOW()")
+            .bind(cache_key)
+            .fetch_optional(pool)
+            .await
+        {
+            Ok(Some(row)) => {
+                let script: String = row.try_get("script_content")?;
+                return Ok(Some(script));
+            }
+            Ok(None) => return Ok(None),
+            Err(e) if attempt < retries - 1 => {
+                warn!("Cache retrieval attempt {} failed: {}", attempt + 1, e);
+                tokio::time::sleep(tokio::time::Duration::from_millis(100 * (attempt + 1) as u64)).await;
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(None)
+}
+
+async fn generate_script_with_comprehensive_fallbacks(html: &str, user_data: &Value) -> Result<String> {
+    // First try: Enhanced form analysis
+    if let Ok(script) = generate_enhanced_form_script(html, user_data).await {
+        if !script.trim().is_empty() {
+            return Ok(script);
+        }
+    }
+    
+    // Second try: Simple form parsing
+    if let Ok(script) = generate_simple_form_script(html, user_data).await {
+        if !script.trim().is_empty() {
+            return Ok(script);
+        }
+    }
+    
+    // Final fallback
+    Ok(generate_basic_navigation_script())
+}
+
+async fn generate_enhanced_form_script(html: &str, user_data: &Value) -> Result<String> {
+    let analyzer = FormAnalyzer::new(html);
+    let mut script = String::new();
+    
+    // Add basic navigation commands
+    script.push_str("wait 2\n");
+    
+    // Process form elements
+    for (element_type, _) in &analyzer.elements {
+        match element_type.as_str() {
+            "input" => script.push_str("// Input field detected\n"),
+            "button" => script.push_str("// Button detected\n"),
+            "select" => script.push_str("// Select field detected\n"),
+            _ => {}
+        }
+    }
+    
+    script.push_str("wait 1\n");
+    Ok(script)
+}
+
+async fn generate_simple_form_script(_html: &str, _user_data: &Value) -> Result<String> {
+    Ok("wait 3\nclick \"Submit\" if present\nwait 2\n".to_string())
+}
+
+fn generate_basic_fallback_script(_html: &str, _user_data: &Value) -> String {
+    "wait 3\nclick \"Continue\" if present\nwait 2\n".to_string()
+}
+
+fn generate_emergency_fallback_script(_html: &str, _user_data: &Value) -> String {
+    "wait 5\n// Emergency fallback - manual intervention may be required\n".to_string()
+}
+
+fn validate_generated_script(script: &str) -> bool {
+    !script.trim().is_empty() && script.len() > 5
+}
+
+async fn cache_dsl_script_with_retry(pool: &PgPool, cache_key: &str, script: &str, html: &str, retries: u32) -> Result<()> {
+    for attempt in 0..retries {
+        match sqlx::query(
+            "INSERT INTO dsl_cache (cache_key, script_content, html_content, expires_at) 
+             VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour')
+             ON CONFLICT (cache_key) DO UPDATE SET 
+             script_content = EXCLUDED.script_content,
+             html_content = EXCLUDED.html_content,
+             expires_at = EXCLUDED.expires_at"
+        )
+        .bind(cache_key)
+        .bind(script)
+        .bind(html)
+        .execute(pool)
+        .await
+        {
+            Ok(_) => return Ok(()),
+            Err(e) if attempt < retries - 1 => {
+                warn!("Cache storage attempt {} failed: {}", attempt + 1, e);
+                tokio::time::sleep(tokio::time::Duration::from_millis(100 * (attempt + 1) as u64)).await;
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
 }
 
 pub async fn generate_dsl_script_with_cache(html: &str, user_data: &Value, db_pool: Option<&PgPool>) -> String {
