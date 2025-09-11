@@ -505,7 +505,7 @@ impl FormAnalyzer {
         ];
         
         for pattern in &cookie_patterns {
-            if let Some(selectors) = self.elements.get(pattern) {
+            if let Some(selectors) = self.elements.get(*pattern) {
                 if !selectors.is_empty() {
                     return Some(selectors[0].clone());
                 }
