@@ -111,15 +111,15 @@ fn create_cache_key(html: &str, user_data: &Value) -> String {
 }
 
 async fn get_cached_dsl_script(pool: &PgPool, cache_key: &str) -> Result<Option<String>> {
-    let result = sqlx::query!(
+    let result = sqlx::query_as::<_, (String,)>(
         "SELECT script_content FROM dsl_scripts_cache 
-         WHERE cache_key = $1 AND expires_at > NOW()",
-        cache_key
+         WHERE cache_key = $1 AND expires_at > NOW()"
     )
+    .bind(cache_key)
     .fetch_optional(pool)
     .await?;
     
-    Ok(result.map(|row| row.script_content))
+    Ok(result.map(|row| row.0))
 }
 
 async fn cache_dsl_script(pool: &PgPool, cache_key: &str, script: &str, html: &str) -> Result<()> {
