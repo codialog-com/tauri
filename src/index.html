@@ -1,74 +1,342 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Codialog - Automatyzacja CV</title>
+    <title>Codialog - Intelligent CV Automation with Bitwarden</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🤖 Codialog - Automatyzacja CV</h1>
-            <p class="subtitle">Inteligentny asystent do automatycznego wypełniania formularzy i wysyłania aplikacji</p>
-        </header>
+    <!-- Navigation Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1><i class="fas fa-robot"></i> Codialog</h1>
+            <p class="version">v0.1.0</p>
+        </div>
         
-        <div class="section">
-            <h2>1. Dane użytkownika</h2>
-            <div class="form-group">
-                <input type="text" id="fullname" placeholder="Imię i nazwisko" required>
-                <input type="email" id="email" placeholder="Email" required>
-                <input type="text" id="username" placeholder="Login do systemu">
-                <input type="password" id="password" placeholder="Hasło">
-                <input type="tel" id="phone" placeholder="Telefon (+48123456789)">
-                <div class="file-input-wrapper">
-                    <input type="file" id="cv-file" accept=".pdf,.doc,.docx" required>
-                    <label for="cv-file" class="file-label">📄 Wybierz plik CV</label>
+        <ul class="nav-menu">
+            <li class="nav-item active" data-tab="dashboard">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </li>
+            <li class="nav-item" data-tab="bitwarden">
+                <i class="fas fa-shield-alt"></i> Bitwarden
+            </li>
+            <li class="nav-item" data-tab="automation">
+                <i class="fas fa-cogs"></i> Automation
+            </li>
+            <li class="nav-item" data-tab="logs">
+                <i class="fas fa-file-alt"></i> Logs
+            </li>
+            <li class="nav-item" data-tab="settings">
+                <i class="fas fa-cog"></i> Settings
+            </li>
+        </ul>
+        
+        <div class="sidebar-footer">
+            <div class="connection-status">
+                <div id="bitwarden-status" class="status-indicator">
+                    <i class="fas fa-circle"></i> <span>Bitwarden: Disconnected</span>
                 </div>
-                <div id="cv-path" class="file-path"></div>
+                <div id="session-status" class="status-indicator">
+                    <i class="fas fa-circle"></i> <span>Session: Inactive</span>
+                </div>
             </div>
         </div>
-
-        <div class="section">
-            <h2>2. URL formularza</h2>
-            <div class="form-group">
-                <input type="url" id="target-url" placeholder="https://example.com/apply" required>
-                <button id="analyze-btn" class="btn btn-secondary">🔍 Analizuj stronę</button>
+    </nav>
+    
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <header class="page-header">
+                <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+                <div class="header-actions">
+                    <button id="refresh-btn" class="btn btn-secondary">
+                        <i class="fas fa-refresh"></i> Refresh
+                    </button>
+                </div>
+            </header>
+            
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-upload"></i> File Upload</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="file-upload-area">
+                            <input type="file" id="cv-upload" accept=".pdf,.doc,.docx" hidden />
+                            <label for="cv-upload" class="upload-zone">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Click to upload your CV</p>
+                                <span class="file-types">PDF, DOC, DOCX</span>
+                            </label>
+                            <div id="uploaded-files" class="uploaded-files"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-user"></i> Personal Information</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="user-form" class="form-grid">
+                            <div class="form-group">
+                                <label for="first-name">First Name</label>
+                                <input type="text" id="first-name" name="firstName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="last-name">Last Name</label>
+                                <input type="text" id="last-name" name="lastName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Phone</label>
+                                <input type="tel" id="phone" name="phone">
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="address">Address</label>
+                                <textarea id="address" name="address" rows="3"></textarea>
+                            </div>
+                        </form>
+                        <div class="form-actions">
+                            <button id="save-profile-btn" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Profile
+                            </button>
+                            <button id="load-from-bitwarden-btn" class="btn btn-secondary">
+                                <i class="fas fa-shield-alt"></i> Load from Bitwarden
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-globe"></i> Target Application</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="url-input-group">
+                            <input type="url" id="target-url" placeholder="https://example.com/careers/job-application" class="url-input">
+                            <button id="analyze-btn" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Analyze
+                            </button>
+                        </div>
+                        <div id="page-analysis" class="analysis-results hidden">
+                            <h4>Page Analysis Results</h4>
+                            <div id="analysis-content"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-magic"></i> Automation Actions</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="action-buttons">
+                            <button id="generate-script-btn" class="btn btn-primary" disabled>
+                                <i class="fas fa-code"></i> Generate DSL Script
+                            </button>
+                            <button id="execute-script-btn" class="btn btn-success" disabled>
+                                <i class="fas fa-play"></i> Execute Automation
+                            </button>
+                        </div>
+                        <div id="script-preview" class="script-preview hidden">
+                            <h4>Generated Script Preview</h4>
+                            <pre id="script-content"></pre>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <div class="section">
-            <h2>3. Wygenerowany skrypt DSL</h2>
-            <textarea id="dsl-script" rows="12" readonly placeholder="Skrypt DSL zostanie wygenerowany automatycznie..."></textarea>
-            <div class="button-group">
-                <button id="generate-btn" class="btn btn-primary">⚡ Generuj DSL</button>
-                <button id="run-btn" class="btn btn-success">🚀 Uruchom automatyzację</button>
-                <button id="clear-btn" class="btn btn-outline">🗑️ Wyczyść</button>
+        
+        <!-- Bitwarden Tab -->
+        <div id="bitwarden" class="tab-content">
+            <header class="page-header">
+                <h2><i class="fas fa-shield-alt"></i> Bitwarden Integration</h2>
+            </header>
+            
+            <div class="bitwarden-container">
+                <div class="card" id="bitwarden-login-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-sign-in-alt"></i> Bitwarden Login</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="bitwarden-login-form">
+                            <div class="form-group">
+                                <label for="bw-email">Email</label>
+                                <input type="email" id="bw-email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="bw-password">Master Password</label>
+                                <input type="password" id="bw-password" required>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-unlock"></i> Login to Bitwarden
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="card hidden" id="bitwarden-vault-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-key"></i> Credentials Vault</h3>
+                        <div class="header-actions">
+                            <input type="search" id="credential-search" placeholder="Search credentials..." class="search-input">
+                            <button id="refresh-credentials-btn" class="btn btn-secondary">
+                                <i class="fas fa-refresh"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="credentials-list" class="credentials-list"></div>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <div class="section">
-            <h2>4. Szablony formularzy</h2>
-            <div class="templates">
-                <button class="template-btn" data-template="job">💼 Aplikacja o pracę</button>
-                <button class="template-btn" data-template="linkedin">💼 LinkedIn Easy Apply</button>
-                <button class="template-btn" data-template="registration">📝 Rejestracja</button>
+        
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <header class="page-header">
+                <h2><i class="fas fa-file-alt"></i> Detailed Logging Panel</h2>
+                <div class="header-actions">
+                    <select id="log-type-filter" class="form-select">
+                        <option value="app">Application Logs</option>
+                        <option value="error">Error Logs</option>
+                        <option value="debug">Debug Logs</option>
+                        <option value="tagui">TagUI Logs</option>
+                    </select>
+                    <select id="log-level-filter" class="form-select">
+                        <option value="all">All Levels</option>
+                        <option value="debug">Debug</option>
+                        <option value="info">Info</option>
+                        <option value="warn">Warning</option>
+                        <option value="error">Error</option>
+                    </select>
+                    <button id="refresh-logs-btn" class="btn btn-secondary">
+                        <i class="fas fa-refresh"></i> Refresh
+                    </button>
+                    <button id="clear-logs-btn" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                </div>
+            </header>
+            
+            <div class="logs-container">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-bar"></i> Log Statistics</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="log-stats" class="log-stats">
+                            <div class="stat-item">
+                                <div class="stat-value" id="total-logs">0</div>
+                                <div class="stat-label">Total Logs</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="error-count">0</div>
+                                <div class="stat-label">Errors</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="warning-count">0</div>
+                                <div class="stat-label">Warnings</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="session-count">0</div>
+                                <div class="stat-label">Active Sessions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-terminal"></i> Live Log Viewer</h3>
+                        <div class="header-controls">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="auto-scroll-logs" checked>
+                                <span>Auto-scroll</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="auto-refresh-logs" checked>
+                                <span>Auto-refresh</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="log-viewer" class="log-viewer"></div>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <div class="section">
-            <h2>5. Status</h2>
-            <div id="status" class="status">Gotowy do rozpoczęcia automatyzacji</div>
-            <div class="progress-bar">
-                <div id="progress" class="progress-fill"></div>
+        
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <header class="page-header">
+                <h2><i class="fas fa-cog"></i> Settings</h2>
+            </header>
+            
+            <div class="settings-container">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-paint-brush"></i> Appearance</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="theme-select">Theme</label>
+                            <select id="theme-select" class="form-select">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                                <option value="auto">Auto</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-robot"></i> Automation Settings</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="auto-fill-forms" checked>
+                                <span>Automatically fill forms when credentials are found</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="save-form-data" checked>
+                                <span>Remember form data for future use</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="script-timeout">Script execution timeout (seconds)</label>
+                            <input type="number" id="script-timeout" value="30" min="10" max="300">
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+    </main>
+    
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Processing...</p>
         </div>
     </div>
-
-    <footer>
-        <p>Codialog v0.1.0 | Developed with ❤️ using Tauri + Rust</p>
-    </footer>
-
+    
     <script src="main.js"></script>
 </body>
 </html>
