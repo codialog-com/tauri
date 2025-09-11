@@ -10,6 +10,9 @@ mod logging;
 mod bitwarden;
 mod session;
 
+#[cfg(test)]
+mod tests;
+
 use axum::{
     routing::{get, post},
     Router,
@@ -20,7 +23,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, error, warn};
+use tracing::{info, error, warn, debug, instrument, span, Level};
 use logging::LogManager;
 use bitwarden::{BitwardenManager, BitwardenCredential};
 use session::{SessionManager, UserSession, UserData};
@@ -106,11 +109,24 @@ struct CredentialsResponse {
 }
 
 // Endpoint do generowania DSL z wsparciem cache'owania
+#[instrument(skip(state, payload), fields(html_length = payload.html.len(), user_data_fields = payload.user_data.as_object().map(|obj| obj.len()).unwrap_or(0)))]
 async fn generate_dsl(
     State(state): State<AppState>,
     Json(payload): Json<DslRequest>,
 ) -> Json<DslResponse> {
-    info!("Generating DSL script for form analysis with caching");
+    let span = span!(Level::INFO, "generate_dsl_endpoint");
+    let _enter = span.enter();
+    
+    info!(
+        html_length = payload.html.len(),
+        user_data_fields = payload.user_data.as_object().map(|obj| obj.len()).unwrap_or(0),
+        "Starting DSL script generation with caching"
+    );
+    
+    debug!("HTML preview: {}", &payload.html.chars().take(200).collect::<String>());
+    debug!("User data keys: {:?}", payload.user_data.as_object().map(|obj| obj.keys().collect::<Vec<_>>()).unwrap_or_default());
+    
+    let start_time = std::time::Instant::now();
     
     // Use enhanced DSL generation with database caching
     let script = llm::generate_dsl_script_with_cache(
@@ -119,26 +135,124 @@ async fn generate_dsl(
         Some(&state.db_pool)
     ).await;
     
+    let generation_time = start_time.elapsed();
+    
+    info!(
+        script_length = script.len(),
+        generation_time_ms = generation_time.as_millis(),
+        "DSL script generation completed successfully"
+    );
+    
+    debug!("Generated script preview: {}", &script.chars().take(300).collect::<String>());
+    
+    // Log to database for analytics
+    if let Err(e) = logging::log_system_event(
+        &state.db_pool,
+        "dsl_generator", 
+        "info",
+        &serde_json::json!({
+            "operation": "dsl_generation",
+            "html_length": payload.html.len(),
+            "script_length": script.len(),
+            "generation_time_ms": generation_time.as_millis(),
+            "user_data_fields": payload.user_data.as_object().map(|obj| obj.len()).unwrap_or(0)
+        })
+    ).await {
+        warn!("Failed to log DSL generation event: {}", e);
+    }
+    
     Json(DslResponse { script })
 }
 
 // Endpoint do uruchamiania skryptu TagUI
+#[instrument(skip(payload), fields(script_length = payload.script.len()))]
 async fn run_tagui(
     Json(payload): Json<RunScriptRequest>,
 ) -> Json<serde_json::Value> {
-    info!("Executing TagUI script");
+    let span = span!(Level::INFO, "run_tagui_endpoint");
+    let _enter = span.enter();
+    
+    info!(
+        script_length = payload.script.len(),
+        "Starting TagUI script execution"
+    );
+    
+    debug!("TagUI script preview: {}", &payload.script.chars().take(500).collect::<String>());
+    
+    let start_time = std::time::Instant::now();
     let result = tagui::execute_script(&payload.script).await;
-    Json(serde_json::json!({ "success": result }))
+    let execution_time = start_time.elapsed();
+    
+    match result {
+        true => {
+            info!(
+                execution_time_ms = execution_time.as_millis(),
+                "TagUI script executed successfully"
+            );
+        }
+        false => {
+            warn!(
+                execution_time_ms = execution_time.as_millis(),
+                "TagUI script execution failed"
+            );
+        }
+    }
+    
+    debug!("TagUI execution result: {}", result);
+    
+    Json(serde_json::json!({ 
+        "success": result,
+        "execution_time_ms": execution_time.as_millis(),
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
 }
 
 // Endpoint do analizy strony przez CDP
+#[instrument(skip(state))]
 async fn analyze_page(
     State(state): State<AppState>,
 ) -> Json<serde_json::Value> {
-    info!("Analyzing current page with CDP");
+    let span = span!(Level::INFO, "analyze_page_endpoint");
+    let _enter = span.enter();
+    
+    info!("Starting page analysis with CDP");
+    
+    let start_time = std::time::Instant::now();
     let url = state.webview_url.lock().await;
-    let html = cdp::get_page_html(&url).await.unwrap_or_default();
-    Json(serde_json::json!({ "html": html }))
+    
+    debug!("Current webview URL: {}", *url);
+    
+    let html = match cdp::get_page_html(&url).await {
+        Ok(content) => {
+            let analysis_time = start_time.elapsed();
+            info!(
+                html_length = content.len(),
+                analysis_time_ms = analysis_time.as_millis(),
+                url = %*url,
+                "Page analysis completed successfully"
+            );
+            
+            debug!("HTML content preview: {}", &content.chars().take(200).collect::<String>());
+            content
+        }
+        Err(e) => {
+            let analysis_time = start_time.elapsed();
+            error!(
+                analysis_time_ms = analysis_time.as_millis(),
+                url = %*url,
+                error = %e,
+                "Page analysis failed"
+            );
+            String::new()
+        }
+    };
+    
+    Json(serde_json::json!({ 
+        "html": html,
+        "url": *url,
+        "analysis_time_ms": start_time.elapsed().as_millis(),
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
 }
 
 // Health check endpoint

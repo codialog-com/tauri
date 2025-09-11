@@ -312,7 +312,118 @@ data-backup: ## Backup application data
 	@tar -czf data/backups/data_backup_$$(date +%Y%m%d_%H%M%S).tar.gz data/ src-tauri/data/
 	@echo "$(GREEN)Data backup created in data/backups/$(NC)"
 
+# Test Management
+test: ## Run all tests
+	@echo "$(YELLOW)🧪 Running all tests...$(NC)"
+	cd src-tauri && cargo test --verbose
+
+test-unit: ## Run unit tests only
+	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
+	cd src-tauri && cargo test --lib --verbose
+
+test-integration: ## Run integration tests only
+	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
+	cd src-tauri && cargo test integration_tests --verbose
+
+test-coverage: ## Generate test coverage report
+	@echo "$(YELLOW)📊 Generating test coverage report...$(NC)"
+	cd src-tauri && cargo install cargo-tarpaulin --locked 2>/dev/null || true
+	cd src-tauri && cargo tarpaulin --out Html --output-dir ../coverage --timeout 300
+	@echo "$(GREEN)Coverage report generated in coverage/tarpaulin-report.html$(NC)"
+
+test-watch: ## Run tests in watch mode
+	@echo "$(YELLOW)👀 Running tests in watch mode...$(NC)"
+	cd src-tauri && cargo install cargo-watch --locked 2>/dev/null || true
+	cd src-tauri && cargo watch -x test
+
+test-bench: ## Run performance benchmarks
+	@echo "$(YELLOW)⚡ Running performance benchmarks...$(NC)"
+	cd src-tauri && cargo bench
+
+test-clean: ## Clean test artifacts
+	@echo "$(YELLOW)🧹 Cleaning test artifacts...$(NC)"
+	cd src-tauri && cargo clean
+	rm -rf coverage/ 2>/dev/null || true
+	@echo "$(GREEN)Test artifacts cleaned$(NC)"
+
+# Database Management
+db-migrate: ## Run database migrations
+	@echo "$(YELLOW)🗄️  Running database migrations...$(NC)"
+	@if docker exec codialog-postgres pg_isready -U codialog_user > /dev/null 2>&1; then \
+		echo "$(GREEN)Database is ready, running migrations...$(NC)"; \
+		cd src-tauri && cargo run --bin migrate 2>/dev/null || echo "$(YELLOW)Migration binary not found, skipping$(NC)"; \
+	else \
+		echo "$(RED)Database is not ready, please start it first with 'make docker-up'$(NC)"; \
+	fi
+
+db-reset: ## Reset database (drop and recreate)
+	@echo "$(YELLOW)🗄️  Resetting database...$(NC)"
+	docker exec codialog-postgres psql -U codialog_user -d postgres -c "DROP DATABASE IF EXISTS codialog;"
+	docker exec codialog-postgres psql -U codialog_user -d postgres -c "CREATE DATABASE codialog;"
+	@echo "$(GREEN)Database reset completed$(NC)"
+
+db-seed: ## Seed database with test data
+	@echo "$(YELLOW)🌱 Seeding database with test data...$(NC)"
+	docker exec codialog-postgres psql -U codialog_user -d codialog -c "\
+		INSERT INTO user_sessions (session_id, user_data, created_at, updated_at, expires_at, is_active) VALUES \
+		('test-session-1', '{\"email\":\"test@example.com\",\"name\":\"Test User\"}', NOW(), NOW(), NOW() + INTERVAL '1 day', true), \
+		('test-session-2', '{\"email\":\"demo@example.com\",\"name\":\"Demo User\"}', NOW(), NOW(), NOW() + INTERVAL '1 day', true) \
+		ON CONFLICT (session_id) DO NOTHING;"
+	@echo "$(GREEN)Database seeded with test data$(NC)"
+
+# Performance and Monitoring
+perf-test: ## Run performance tests
+	@echo "$(YELLOW)⚡ Running performance tests...$(NC)"
+	@echo "Testing API endpoints..."
+	@for endpoint in "/health" "/api/status"; do \
+		echo "Testing $$endpoint..."; \
+		curl -w "Time: %{time_total}s\n" -s "http://localhost:3000$$endpoint" -o /dev/null || true; \
+	done
+
+monitor: ## Start monitoring dashboard
+	@echo "$(YELLOW)📊 Starting monitoring dashboard...$(NC)"
+	@echo "Database status:"
+	@docker exec codialog-postgres pg_isready -U codialog_user || echo "Database not ready"
+	@echo "Redis status:"
+	@docker exec codialog-redis redis-cli ping || echo "Redis not ready"
+	@echo "Application logs (last 10 lines):"
+	@tail -n 10 logs/app.log 2>/dev/null || echo "No app logs found"
+
+# Maintenance
+maintenance-mode: ## Enable maintenance mode
+	@echo "$(YELLOW)🚧 Enabling maintenance mode...$(NC)"
+	@echo "maintenance" > .maintenance
+	docker pause codialog-app 2>/dev/null || true
+	@echo "$(GREEN)Maintenance mode enabled$(NC)"
+
+maintenance-off: ## Disable maintenance mode
+	@echo "$(YELLOW)🔧 Disabling maintenance mode...$(NC)"
+	@rm -f .maintenance
+	docker unpause codialog-app 2>/dev/null || true
+	@echo "$(GREEN)Maintenance mode disabled$(NC)"
+
+# Documentation
+docs: ## Generate documentation
+	@echo "$(YELLOW)📚 Generating documentation...$(NC)"
+	cd src-tauri && cargo doc --no-deps --open 2>/dev/null || cargo doc --no-deps
+	@echo "$(GREEN)Documentation generated and opened in browser$(NC)"
+
+docs-api: ## Generate API documentation
+	@echo "$(YELLOW)📋 API Documentation available at:$(NC)"
+	@echo "  - Health Check: http://localhost:3000/health"
+	@echo "  - DSL Generation: POST http://localhost:3000/dsl/generate"
+	@echo "  - Bitwarden Login: POST http://localhost:3000/bitwarden/login"
+	@echo "  - Session Management: GET/POST http://localhost:3000/session"
+
 # Quick Commands
-full-reset: docker-down clean data-clean init docker-up ## Complete reset (clean everything and reinitialize)
+full-reset: docker-down clean data-clean test-clean init docker-up ## Complete reset (clean everything and reinitialize)
 
 quick-start: init docker-up dev ## Quick start for new users (complete setup and run)
+
+quick-test: test-unit test-integration ## Quick test suite (unit + integration)
+
+dev-setup: init docker-up db-migrate db-seed ## Complete development setup
+
+.PHONY: test test-unit test-integration test-coverage test-watch test-bench test-clean \
+        db-migrate db-reset db-seed perf-test monitor maintenance-mode maintenance-off \
+        docs docs-api full-reset quick-start quick-test dev-setup
