@@ -103,9 +103,12 @@ fn main() {
         webview_url: Arc::new(Mutex::new(String::new())),
     };
 
+    // Stwórz Tokio runtime
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    
     // Uruchom serwer HTTP w tle
     let state_clone = app_state.clone();
-    tokio::spawn(async move {
+    rt.spawn(async move {
         let app = Router::new()
             .route("/health", get(health))
             .route("/dsl/generate", post(generate_dsl))
@@ -122,7 +125,7 @@ fn main() {
     });
 
     // Initialize TagUI if not present
-    tokio::spawn(async {
+    rt.spawn(async {
         if !tagui::check_tagui_installed().await {
             info!("TagUI not found, installing...");
             if tagui::install_tagui() {
