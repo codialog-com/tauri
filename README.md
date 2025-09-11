@@ -92,24 +92,58 @@ System jest w pełni skonteneryzowany, co sprawia, że uruchomienie go jest niez
 
 3. Aplikacja będzie dostępna pod adresem: [http://localhost:1420](http://localhost:1420)
 
-## 🛠️ Zarządzanie i Testowanie
+## 🛠️ Rozszerzone Zarządzanie Projektem
 
-Dzięki `Makefile` zarządzanie środowiskiem jest proste:
+Dzięki zaktualizowanemu `Makefile` zarządzanie środowiskiem jest bardzo proste:
 
-- **Uruchomienie wszystkich testów** (jednostkowe, integracyjne, E2E):
-  ```bash
-  make test-all
-  ```
+### 🚀 Podstawowe Komendy
+```bash
+# Szybki start - wszystko w jednym poleceniu
+make quick-start       # Setup + build + run + testy
 
-- **Dostęp do panelu monitoringu** (Grafana):
-  ```bash
-  make monitor
-  ```
+# Zarządzanie usługami
+make up               # Uruchomienie Docker services
+make down             # Zatrzymanie usług
+make restart          # Restart wszystkich usług
+make status           # Status usług i healthchecks
+```
 
-- **Zatrzymanie usług**:
-  ```bash
-  make down
-  ```
+### 🧪 Nowe Komendy Testowe
+```bash
+# Kompleksowe testowanie
+make test-all         # Wszystkie testy (unit + integration + e2e)
+make quick-test       # Szybkie testy (tylko unit + integration)
+make test-coverage    # Raport pokrycia testami
+make test-watch       # Tryb ciągłego testowania
+make test-bench       # Benchmarki wydajnościowe
+```
+
+### 🗄️ Zarządzanie Bazą Danych
+```bash
+make db-init          # Inicjalizacja bazy danych
+make db-migrate       # Wykonanie migracji
+make db-reset         # Reset bazy do czystego stanu
+make db-seed          # Zasilenie przykładowymi danymi
+make db-backup        # Backup bazy danych
+make db-restore FILE= # Przywrócenie z backupu
+```
+
+### 📊 Monitoring i Wydajność
+```bash
+make monitor          # Panel Grafana (localhost:3000)
+make performance-test # Testy wydajnościowe z k6
+make logs-stats       # Statystyki logów aplikacji
+make health-check     # Sprawdzenie stanu wszystkich usług
+```
+
+### 🔧 Tryb Deweloperski
+```bash
+make dev              # Tryb deweloperski z hot reload
+make dev-setup        # Pełne środowisko deweloperskie  
+make lint             # Linting kodu (Rust + JS)
+make format           # Formatowanie kodu
+make clean-all        # Czyszczenie wszystkich artefaktów
+```
 
 ## 📁 Struktura Projektu
 
@@ -161,7 +195,7 @@ codialog/
 | **[src/index.html](src/index.html)** | Główny interfejs użytkownika | [🎨](src/index.html) |
 | **[src/main.js](src/main.js)** | Logika frontend JavaScript | [⚡](src/main.js) |
 
-## 🔧 API Endpoints
+## 🔧 Rozszerzone API Endpoints
 
 Aplikacja oferuje RESTful API dostępne pod `http://127.0.0.1:4000`:
 
@@ -174,11 +208,38 @@ GET /health
 {
   "status": "healthy",
   "services": {
-    "database": "not_implemented", 
-    "redis": "not_implemented",
+    "database": "connected", 
+    "redis": "connected",
+    "bitwarden": "available",
     "tagui": true
-  }
+  },
+  "version": "2.0.0",
+  "uptime": "2h 15m 30s"
 }
+```
+
+### 🔐 Nowe Bitwarden API Endpoints
+```http
+# Login do Bitwarden
+POST /bitwarden/login
+Content-Type: application/json
+{
+  "email": "user@example.com",
+  "password": "master_password"
+}
+
+# Unlock vault z master password
+POST /bitwarden/unlock  
+Content-Type: application/json
+{
+  "master_password": "your_master_password"
+}
+
+# Pobranie credentials dla domeny
+GET /bitwarden/credentials?domain=linkedin.com
+
+# Status sesji Bitwarden
+GET /bitwarden/status
 ```
 
 ### 🧠 Generowanie Skryptów DSL
@@ -392,22 +453,84 @@ make deploy-staging
 make deploy-prod
 ```
 
+## 🚀 Przykłady Użycia Nowych Funkcji
+
+### Pełny Przepływ z Bitwarden
+```bash
+# 1. Uruchomienie aplikacji z wszystkimi usługami
+make quick-start
+
+# 2. Login do Bitwarden przez API
+curl -X POST http://localhost:4000/bitwarden/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"master_pass"}'
+
+# 3. Unlock vault
+curl -X POST http://localhost:4000/bitwarden/unlock \
+  -H "Content-Type: application/json" \
+  -d '{"master_password":"master_pass"}'
+
+# 4. Pobranie credentials dla LinkedIn
+curl "http://localhost:4000/bitwarden/credentials?domain=linkedin.com"
+
+# 5. Automatyczne wypełnienie formularza z cache DSL
+curl -X POST http://localhost:4000/dsl/generate \
+  -H "Content-Type: application/json" \
+  -d '{"action_type":"job_application","user_data":{...},"target_url":"https://linkedin.com/jobs/apply/123"}'
+```
+
+### Monitoring w Czasie Rzeczywistym  
+```bash
+# Panel monitoringu z wszystkimi metrykami
+make monitor
+
+# Śledzenie logów z filtrowaniem
+make logs-follow | grep "ERROR\|WARN"
+
+# Statystyki wydajności
+make logs-stats
+
+# Testy wydajnościowe
+make performance-test
+```
+
+### Maintenance Mode
+```bash
+# Włączenie trybu maintenance (blokada nowych sesji)
+make maintenance-on
+
+# Sprawdzenie statusu maintenance
+make status
+
+# Wyłączenie trybu maintenance
+make maintenance-off
+
+# Backup przed maintenance
+make db-backup
+```
+
 ## 🔧 Rozwój i Kontrybucje
 
-### Setup środowiska deweloperskiego:
+### Setup rozszerzonego środowiska deweloperskiego:
 ```bash  
-# Instalacja zależności
-make install
+# Pełne środowisko deweloperskie
+make dev-setup
 
-# Uruchomienie w trybie dev
+# Uruchomienie w trybie dev z hot reload
 make dev
 
-# Hot reload dla frontendu
-make dev-frontend
+# Testowanie w trybie watch (ciągłe)
+make test-watch
 
 # Linting i formatowanie
 make lint
 make format
+
+# Generowanie dokumentacji
+make docs
+
+# Czyszczenie wszystkich artefaktów
+make clean-all
 ```
 
 ### Struktura Pull Request:

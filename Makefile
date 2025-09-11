@@ -58,19 +58,9 @@ build: ## Build production application
 	@echo "$(YELLOW)Building Codialog for production...$(NC)"
 	npm run build
 
-# Testing
-test: ## Run all tests
-	@echo "$(YELLOW)Running all tests...$(NC)"
-	npm test
-
-test-unit: ## Run unit tests only
-	npm run test:unit
-
+# Legacy Testing (replaced by Rust tests in Test Management section)
 test-e2e: ## Run E2E tests only
 	npm run test:e2e
-
-test-watch: ## Run tests in watch mode
-	npm run test:watch
 
 coverage: ## Generate test coverage report
 	npm run test:coverage
@@ -204,26 +194,7 @@ docker-clean: ## Clean Docker containers, volumes, and networks
 	docker network prune -f
 	@echo "$(GREEN)Docker resources cleaned$(NC)"
 
-# Database Management
-db-migrate: ## Run database migrations
-	@echo "$(YELLOW)Running database migrations...$(NC)"
-	@if docker ps | grep -q codialog-postgres; then \
-		docker exec -i codialog-postgres psql -U $${POSTGRES_USER:-codialog} -d $${POSTGRES_DB:-codialog} < src-tauri/migrations/001_initial.sql; \
-		echo "$(GREEN)Database migrations completed$(NC)"; \
-	else \
-		echo "$(RED)PostgreSQL container not running. Start with 'make docker-up'$(NC)"; \
-	fi
-
-db-reset: ## Reset database (drop and recreate schema)
-	@echo "$(YELLOW)Resetting database...$(NC)"
-	@if docker ps | grep -q codialog-postgres; then \
-		docker exec codialog-postgres dropdb -U $${POSTGRES_USER:-codialog} $${POSTGRES_DB:-codialog} --if-exists; \
-		docker exec codialog-postgres createdb -U $${POSTGRES_USER:-codialog} $${POSTGRES_DB:-codialog}; \
-		make db-migrate; \
-		echo "$(GREEN)Database reset completed$(NC)"; \
-	else \
-		echo "$(RED)PostgreSQL container not running$(NC)"; \
-	fi
+# Legacy Database Management (replaced by newer targets below)
 
 db-backup: ## Create database backup
 	@echo "$(YELLOW)Creating database backup...$(NC)"
