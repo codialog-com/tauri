@@ -176,8 +176,11 @@ impl SessionManager {
         // Cache w Redis dla szybkiego dostępu
         let mut redis_conn = self.redis_client.get_async_connection().await?;
         let session_json = serde_json::to_string(&session)?;
-        let _: () = redis_conn
-            .setex(&format!("session:{}", session_id), 86400, session_json)
+        redis::cmd("SETEX")
+            .arg(&format!("session:{}", session_id))
+            .arg(86400)
+            .arg(session_json)
+            .query_async(&mut redis_conn)
             .await?;
 
         info!("Session created successfully: {}", session_id);
@@ -232,8 +235,11 @@ impl SessionManager {
 
             // Odśwież cache w Redis
             let session_json = serde_json::to_string(&session)?;
-            let _: () = redis_conn
-                .setex(&format!("session:{}", session_id), 86400, session_json)
+            redis::cmd("SETEX")
+                .arg(&format!("session:{}", session_id))
+                .arg(86400)
+                .arg(session_json)
+                .query_async(&mut redis_conn)
                 .await?;
 
             debug!("Session found in database and cached: {}", session_id);
@@ -266,8 +272,11 @@ impl SessionManager {
         // Aktualizuj cache w Redis
         let mut redis_conn = self.redis_client.get_async_connection().await?;
         let session_json = serde_json::to_string(session)?;
-        let _: () = redis_conn
-            .setex(&format!("session:{}", session.session_id), 86400, session_json)
+        redis::cmd("SETEX")
+            .arg(&format!("session:{}", session.session_id))
+            .arg(86400)
+            .arg(session_json)
+            .query_async(&mut redis_conn)
             .await?;
 
         debug!("Session updated successfully: {}", session.session_id);

@@ -11,6 +11,21 @@ pub async fn generate_dsl_script(html: &str, user_data: &Value) -> String {
     generate_dsl_script_with_cache(html, user_data, None).await
 }
 
+fn generate_basic_navigation_script() -> String {
+    debug!("Generating basic navigation script as fallback");
+    
+    // Basic navigation script for common scenarios
+    let script = r#"
+// Basic navigation script
+wait 3
+click "Accept" if present
+click "Login" if present
+wait 2
+"#;
+    
+    script.trim().to_string()
+}
+
 pub async fn generate_dsl_script_with_cache(html: &str, user_data: &Value, db_pool: Option<&PgPool>) -> String {
     info!("Generating DSL script from HTML and user data");
     
