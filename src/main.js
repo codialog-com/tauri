@@ -1,33 +1,180 @@
 const API_URL = 'http://localhost:4000';
 
-// Global state
-let currentPageHTML = '';
-let isProcessing = false;
+// Global state management
+let appState = {
+    currentPageHTML: '',
+    isProcessing: false,
+    activeTab: 'dashboard',
+    bitwardenStatus: 'logged-out', // logged-out, locked, unlocked
+    sessionId: null,
+    credentials: [],
+    logs: [],
+    logFilters: {
+        level: 'all',
+        component: 'all',
+        search: ''
+    },
+    settings: {
+        theme: 'dark',
+        autoSave: true,
+        notifications: true,
+        logRetention: 30
+    }
+};
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    initializeEventListeners();
-    checkBackendConnection();
+    initializeApp();
 });
 
+async function initializeApp() {
+    try {
+        showStatus('🚀 Inicjalizowanie aplikacji...', 'info');
+        
+        // Initialize UI components
+        initializeEventListeners();
+        initializeSidebar();
+        initializeTabSystem();
+        
+        // Check backend connection
+        await checkBackendConnection();
+        
+        // Load user session if exists
+        await loadUserSession();
+        
+        // Load settings
+        loadSettings();
+        
+        // Set initial tab
+        showTab('dashboard');
+        
+        showStatus('✅ Aplikacja gotowa do użycia', 'success');
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showStatus('❌ Błąd inicjalizacji aplikacji', 'error');
+    }
+}
+
 function initializeEventListeners() {
-    // File upload handling
-    document.getElementById('cv-file').addEventListener('change', handleFileUpload);
+    // Dashboard form elements
+    const cvFile = document.getElementById('cv-file');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const generateBtn = document.getElementById('generate-btn');
+    const runBtn = document.getElementById('run-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const targetUrl = document.getElementById('target-url');
+    const email = document.getElementById('email');
     
-    // Button event listeners
-    document.getElementById('analyze-btn').addEventListener('click', analyzePage);
-    document.getElementById('generate-btn').addEventListener('click', generateDSL);
-    document.getElementById('run-btn').addEventListener('click', runAutomation);
-    document.getElementById('clear-btn').addEventListener('click', clearForm);
+    if (cvFile) cvFile.addEventListener('change', handleFileUpload);
+    if (analyzeBtn) analyzeBtn.addEventListener('click', analyzePage);
+    if (generateBtn) generateBtn.addEventListener('click', generateDSL);
+    if (runBtn) runBtn.addEventListener('click', runAutomation);
+    if (clearBtn) clearBtn.addEventListener('click', clearForm);
+    if (targetUrl) targetUrl.addEventListener('input', validateURL);
+    if (email) email.addEventListener('input', validateEmail);
     
     // Template buttons
     document.querySelectorAll('.template-btn').forEach(btn => {
         btn.addEventListener('click', (e) => loadTemplate(e.target.dataset.template));
     });
     
-    // Form validation
-    document.getElementById('target-url').addEventListener('input', validateURL);
-    document.getElementById('email').addEventListener('input', validateEmail);
+    // Bitwarden form elements
+    const bwLoginBtn = document.getElementById('bw-login-btn');
+    const bwUnlockBtn = document.getElementById('bw-unlock-btn');
+    const bwRefreshBtn = document.getElementById('bw-refresh-btn');
+    const bwLogoutBtn = document.getElementById('bw-logout-btn');
+    const bwSearchInput = document.getElementById('bw-search');
+    
+    if (bwLoginBtn) bwLoginBtn.addEventListener('click', handleBitwardenLogin);
+    if (bwUnlockBtn) bwUnlockBtn.addEventListener('click', handleBitwardenUnlock);
+    if (bwRefreshBtn) bwRefreshBtn.addEventListener('click', refreshBitwardenCredentials);
+    if (bwLogoutBtn) bwLogoutBtn.addEventListener('click', handleBitwardenLogout);
+    if (bwSearchInput) bwSearchInput.addEventListener('input', filterCredentials);
+    
+    // Logging panel elements
+    const logRefreshBtn = document.getElementById('log-refresh-btn');
+    const logClearBtn = document.getElementById('log-clear-btn');
+    const logLevelFilter = document.getElementById('log-level-filter');
+    const logComponentFilter = document.getElementById('log-component-filter');
+    const logSearchInput = document.getElementById('log-search');
+    
+    if (logRefreshBtn) logRefreshBtn.addEventListener('click', refreshLogs);
+    if (logClearBtn) logClearBtn.addEventListener('click', clearLogs);
+    if (logLevelFilter) logLevelFilter.addEventListener('change', updateLogFilters);
+    if (logComponentFilter) logComponentFilter.addEventListener('change', updateLogFilters);
+    if (logSearchInput) logSearchInput.addEventListener('input', updateLogFilters);
+    
+    // Settings elements
+    const themeSelect = document.getElementById('theme-select');
+    const autoSaveCheck = document.getElementById('auto-save-check');
+    const notificationsCheck = document.getElementById('notifications-check');
+    
+    if (themeSelect) themeSelect.addEventListener('change', updateSettings);
+    if (autoSaveCheck) autoSaveCheck.addEventListener('change', updateSettings);
+    if (notificationsCheck) notificationsCheck.addEventListener('change', updateSettings);
+}
+
+// Initialize sidebar navigation
+function initializeSidebar() {
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    sidebarItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tabId = item.dataset.tab;
+            if (tabId) {
+                showTab(tabId);
+            }
+        });
+    });
+}
+
+// Initialize tab system
+function initializeTabSystem() {
+    // Hide all tabs initially except dashboard
+    const tabs = document.querySelectorAll('.tab-content');
+    tabs.forEach(tab => {
+        if (tab.id !== 'dashboard-tab') {
+            tab.style.display = 'none';
+        }
+    });
+}
+
+// Show specific tab and update sidebar
+function showTab(tabId) {
+    // Hide all tabs
+    const tabs = document.querySelectorAll('.tab-content');
+    tabs.forEach(tab => tab.style.display = 'none');
+    
+    // Show selected tab
+    const selectedTab = document.getElementById(`${tabId}-tab`);
+    if (selectedTab) {
+        selectedTab.style.display = 'block';
+    }
+    
+    // Update sidebar active state
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    sidebarItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.tab === tabId) {
+            item.classList.add('active');
+        }
+    });
+    
+    // Update app state
+    appState.activeTab = tabId;
+    
+    // Initialize tab-specific functionality
+    switch (tabId) {
+        case 'bitwarden':
+            updateBitwardenUI();
+            break;
+        case 'logs':
+            refreshLogs();
+            break;
+        case 'settings':
+            loadSettingsUI();
+            break;
+    }
 }
 
 // Check if backend is running
@@ -41,6 +188,128 @@ async function checkBackendConnection() {
         }
     } catch (error) {
         showStatus('❌ Brak połączenia z backendem', 'error');
+    }
+}
+
+// Session Management Functions
+async function loadUserSession() {
+    try {
+        const response = await fetch(`${API_URL}/session/get`, {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const sessionData = await response.json();
+            appState.sessionId = sessionData.session_id;
+            
+            // Restore form data if available
+            if (sessionData.user_data) {
+                restoreFormData(sessionData.user_data);
+            }
+            
+            showNotification('✅ Sesja użytkownika wczytana', 'success');
+        }
+    } catch (error) {
+        console.error('Session load error:', error);
+    }
+}
+
+async function saveUserSession() {
+    if (!appState.settings.autoSave) return;
+    
+    try {
+        const userData = collectUserData();
+        const response = await fetch(`${API_URL}/session/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                user_data: userData,
+                form_data: userData
+            })
+        });
+        
+        if (response.ok) {
+            const sessionData = await response.json();
+            appState.sessionId = sessionData.session_id;
+        }
+    } catch (error) {
+        console.error('Session save error:', error);
+    }
+}
+
+// Bitwarden Integration Functions
+async function handleBitwardenLogin() {
+    const email = document.getElementById('bw-email').value.trim();
+    const password = document.getElementById('bw-password').value.trim();
+    
+    if (!email || !password) {
+        showStatus('❌ Podaj email i hasło do Bitwarden', 'error');
+        return;
+    }
+    
+    setProcessing(true);
+    showStatus('🔑 Logowanie do Bitwarden...', 'info');
+    
+    try {
+        const response = await fetch(`${API_URL}/bitwarden/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            appState.bitwardenStatus = 'locked';
+            updateBitwardenUI();
+            showStatus('✅ Zalogowano do Bitwarden', 'success');
+        } else {
+            const error = await response.json();
+            showStatus(`❌ Błąd logowania: ${error.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Bitwarden login error:', error);
+        showStatus('❌ Błąd połączenia z Bitwarden', 'error');
+    } finally {
+        setProcessing(false);
+    }
+}
+
+async function handleBitwardenUnlock() {
+    const masterPassword = document.getElementById('bw-master-password').value.trim();
+    
+    if (!masterPassword) {
+        showStatus('❌ Podaj hasło główne', 'error');
+        return;
+    }
+    
+    setProcessing(true);
+    showStatus('🔓 Odblokowywanie sejfu...', 'info');
+    
+    try {
+        const response = await fetch(`${API_URL}/bitwarden/unlock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ master_password: masterPassword })
+        });
+        
+        if (response.ok) {
+            appState.bitwardenStatus = 'unlocked';
+            updateBitwardenUI();
+            await refreshBitwardenCredentials();
+            showStatus('✅ Sejf odblokowany', 'success');
+            
+            // Clear master password field
+            document.getElementById('bw-master-password').value = '';
+        } else {
+            const error = await response.json();
+            showStatus(`❌ Błąd odblokowywania: ${error.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Bitwarden unlock error:', error);
+        showStatus('❌ Błąd odblokowywania sejfu', 'error');
+    } finally {
+        setProcessing(false);
     }
 }
 
