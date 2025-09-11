@@ -105,12 +105,20 @@ struct CredentialsResponse {
     error: Option<String>,
 }
 
-// Endpoint do generowania DSL przez LLM
+// Endpoint do generowania DSL z wsparciem cache'owania
 async fn generate_dsl(
+    State(state): State<AppState>,
     Json(payload): Json<DslRequest>,
 ) -> Json<DslResponse> {
-    info!("Generating DSL script for form analysis");
-    let script = llm::generate_dsl_script(&payload.html, &payload.user_data).await;
+    info!("Generating DSL script for form analysis with caching");
+    
+    // Use enhanced DSL generation with database caching
+    let script = llm::generate_dsl_script_with_cache(
+        &payload.html, 
+        &payload.user_data, 
+        Some(&state.db_pool)
+    ).await;
+    
     Json(DslResponse { script })
 }
 

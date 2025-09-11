@@ -4,8 +4,9 @@ use tracing::{info, error, debug, warn};
 use crate::tagui::escape_for_dsl;
 use sqlx::PgPool;
 use chrono::{DateTime, Utc};
-use anyhow::Result;
+use anyhow::{Result, Context};
 use std::collections::HashMap;
+use std::time::Duration;
 
 pub async fn generate_dsl_script(html: &str, user_data: &Value) -> String {
     generate_dsl_script_with_cache(html, user_data, None).await
@@ -14,50 +15,195 @@ pub async fn generate_dsl_script(html: &str, user_data: &Value) -> String {
 pub async fn generate_dsl_script_with_cache(html: &str, user_data: &Value, db_pool: Option<&PgPool>) -> String {
     info!("Generating DSL script from HTML and user data");
     
-    // Create cache key from HTML and user data hash
-    let cache_key = create_cache_key(html, user_data);
+    // Input validation with error recovery
+    if html.trim().is_empty() {
+        warn!("Empty HTML provided, generating basic navigation script");
+        return generate_basic_navigation_script();
+    }
     
-    // Try to get cached script first
+    // Validate user data structure
+    if !user_data.is_object() {
+        warn!("Invalid user data format, using empty data for DSL generation");
+    }
+    
+    // Create cache key with error handling
+    let cache_key = match create_cache_key(html, user_data) {
+        Ok(key) => key,
+        Err(e) => {
+            error!("Failed to create cache key: {}, proceeding without cache", e);
+            format!("fallback_{}", html.len())
+        }
+    };
+    
+    // Try to get cached script first with retry logic
     if let Some(pool) = db_pool {
-        if let Ok(Some(cached_script)) = get_cached_dsl_script(pool, &cache_key).await {
-            info!("Using cached DSL script for key: {}", cache_key);
-            return cached_script;
+        match get_cached_dsl_script_with_retry(pool, &cache_key, 3).await {
+            Ok(Some(cached_script)) => {
+                info!("Using cached DSL script for key: {}", cache_key);
+                return cached_script;
+            }
+            Ok(None) => debug!("No cached script found for key: {}", cache_key),
+            Err(e) => warn!("Cache retrieval failed: {}", e),
         }
     }
     
-    // Generate new script
-    let script = if is_complex_form(html) {
-        // Try LLM first for complex forms
-        if let Ok(llm_script) = generate_dsl_with_llm(html, user_data).await {
-            if !llm_script.is_empty() {
-                llm_script
+    // Generate new script with comprehensive fallback strategy
+    let script = match generate_script_with_comprehensive_fallbacks(html, user_data).await {
+        Ok(generated_script) => {
+            if generated_script.trim().is_empty() {
+                warn!("Generated script is empty, using basic fallback");
+                generate_basic_fallback_script(html, user_data)
             } else {
-                generate_enhanced_dsl(html, user_data)
+                generated_script
             }
-        } else {
-            generate_enhanced_dsl(html, user_data)
         }
-    } else {
-        // Use enhanced logic for simple forms
-        generate_enhanced_dsl(html, user_data)
+        Err(e) => {
+            error!("All DSL generation methods failed: {}, using emergency fallback", e);
+            generate_emergency_fallback_script(html, user_data)
+        }
     };
     
-    // Cache the generated script
-    if let Some(pool) = db_pool {
-        if let Err(e) = cache_dsl_script(pool, &cache_key, &script, html).await {
-            warn!("Failed to cache DSL script: {}", e);
+    // Validate generated script before caching
+    if validate_generated_script(&script) {
+        // Cache the generated script with retry logic
+        if let Some(pool) = db_pool {
+            match cache_dsl_script_with_retry(pool, &cache_key, &script, html, 3).await {
+                Ok(_) => debug!("Successfully cached DSL script"),
+                Err(e) => warn!("Failed to cache DSL script after retries: {}", e),
+            }
         }
+    } else {
+        warn!("Generated script failed validation, not caching");
     }
     
     script
 }
 
-fn generate_simple_dsl(html: &str, user_data: &Value) -> String {
-    debug!("Using simple DSL generation");
+// Cache management functions
+fn create_cache_key(html: &str, user_data: &Value) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    
+    let mut hasher = DefaultHasher::new();
+    
+    // Create simplified HTML signature (remove dynamic content)
+    let html_signature = html
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            trimmed.contains("<input") || trimmed.contains("<button") || 
+            trimmed.contains("<form") || trimmed.contains("<select") ||
+            trimmed.contains("type=") || trimmed.contains("id=") ||
+            trimmed.contains("name=") || trimmed.contains("class=")
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    
+    html_signature.hash(&mut hasher);
+    
+    // Hash user data structure (not values for privacy)
+    let user_keys: Vec<String> = user_data.as_object()
+        .map(|obj| obj.keys().cloned().collect())
+        .unwrap_or_default();
+    user_keys.join(",").hash(&mut hasher);
+    
+    format!("dsl_{:x}", hasher.finish())
+}
+
+async fn get_cached_dsl_script(pool: &PgPool, cache_key: &str) -> Result<Option<String>> {
+    let result = sqlx::query!(
+        "SELECT script_content FROM dsl_scripts_cache 
+         WHERE cache_key = $1 AND expires_at > NOW()",
+        cache_key
+    )
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(result.map(|row| row.script_content))
+}
+
+async fn cache_dsl_script(pool: &PgPool, cache_key: &str, script: &str, html: &str) -> Result<()> {
+    let expires_at = Utc::now() + chrono::Duration::hours(24); // Cache for 24 hours
+    let html_hash = format!("{:x}", {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        html.hash(&mut hasher);
+        hasher.finish()
+    });
+    
+    sqlx::query!(
+        "INSERT INTO dsl_scripts_cache (cache_key, script_content, html_hash, created_at, expires_at)
+         VALUES ($1, $2, $3, NOW(), $4)
+         ON CONFLICT (cache_key) 
+         DO UPDATE SET 
+           script_content = EXCLUDED.script_content,
+           html_hash = EXCLUDED.html_hash,
+           created_at = NOW(),
+           expires_at = EXCLUDED.expires_at",
+        cache_key,
+        script,
+        html_hash,
+        expires_at
+    )
+    .execute(pool)
+    .await?;
+    
+    Ok(())
+}
+
+fn generate_enhanced_dsl(html: &str, user_data: &Value) -> String {
+    debug!("Using enhanced DSL generation");
     
     let mut script = String::new();
+    let mut actions = Vec::new();
     
-    // Analiza formularza w HTML i mapowanie pól
+    // Enhanced form analysis with better element detection
+    let form_analyzer = FormAnalyzer::new(html);
+    
+    // 1. Handle cookie consent first
+    if let Some(cookie_btn) = form_analyzer.find_cookie_consent() {
+        actions.push(format!("click \"{}\"", cookie_btn));
+        actions.push("wait 1000".to_string());
+    }
+    
+    // 2. Handle login if needed
+    if form_analyzer.is_login_form() {
+        if let Some(login_actions) = generate_login_sequence(&form_analyzer, user_data) {
+            actions.extend(login_actions);
+        }
+    }
+    
+    // 3. Fill form fields intelligently
+    let field_actions = generate_field_filling_sequence(&form_analyzer, user_data);
+    actions.extend(field_actions);
+    
+    // 4. Handle file uploads
+    if let Some(upload_actions) = generate_upload_sequence(&form_analyzer, user_data) {
+        actions.extend(upload_actions);
+    }
+    
+    // 5. Handle checkboxes and agreements
+    let checkbox_actions = generate_checkbox_sequence(&form_analyzer);
+    actions.extend(checkbox_actions);
+    
+    // 6. Submit form
+    if let Some(submit_btn) = form_analyzer.find_submit_button() {
+        actions.push("wait 500".to_string());
+        actions.push(format!("click \"{}\"", submit_btn));
+    }
+    
+    // Join all actions
+    script = actions.join("\n");
+    
+    debug!("Generated enhanced DSL script with {} actions", actions.len());
+    script
+}
+
+fn generate_simple_dsl(html: &str, user_data: &Value) -> String {
+    debug!("Using simple DSL generation (fallback)");
+    
+    let mut script = String::new();
     
     // Sprawdź czy jest przycisk logowania
     if html.contains("id=\"login-btn\"") || html.contains("class=\"login") {
@@ -113,6 +259,294 @@ fn generate_simple_dsl(html: &str, user_data: &Value) -> String {
     
     debug!("Generated simple DSL script with {} lines", script.lines().count());
     script
+}
+
+// Enhanced Form Analysis
+struct FormAnalyzer {
+    html: String,
+    elements: HashMap<String, Vec<String>>,
+}
+
+impl FormAnalyzer {
+    fn new(html: &str) -> Self {
+        let mut analyzer = FormAnalyzer {
+            html: html.to_string(),
+            elements: HashMap::new(),
+        };
+        analyzer.analyze_elements();
+        analyzer
+    }
+    
+    fn analyze_elements(&mut self) {
+        // Parse HTML to find form elements (simplified parser)
+        let lines: Vec<&str> = self.html.lines().collect();
+        
+        for line in lines {
+            if line.contains("<input") {
+                self.parse_input_element(line);
+            } else if line.contains("<button") || line.contains("<input") && line.contains("type=\"submit\"") {
+                self.parse_button_element(line);
+            } else if line.contains("<select") {
+                self.parse_select_element(line);
+            }
+        }
+    }
+    
+    fn parse_input_element(&mut self, line: &str) {
+        let input_type = self.extract_attribute(line, "type").unwrap_or("text".to_string());
+        let id = self.extract_attribute(line, "id");
+        let name = self.extract_attribute(line, "name");
+        let class = self.extract_attribute(line, "class");
+        
+        let mut selectors = Vec::new();
+        if let Some(id) = id {
+            selectors.push(format!("#{}", id));
+        }
+        if let Some(name) = name {
+            selectors.push(format!("[name=\"{}\"]", name));
+        }
+        if let Some(class) = class {
+            selectors.push(format!(".{}", class));
+        }
+        
+        self.elements.entry(input_type).or_insert_with(Vec::new).extend(selectors);
+    }
+    
+    fn parse_button_element(&mut self, line: &str) {
+        let id = self.extract_attribute(line, "id");
+        let class = self.extract_attribute(line, "class");
+        let text_content = self.extract_text_content(line);
+        
+        let mut selectors = Vec::new();
+        if let Some(id) = id {
+            selectors.push(format!("#{}", id));
+        }
+        if let Some(class) = class {
+            selectors.push(format!(".{}", class));
+        }
+        
+        // Classify button type based on content
+        let button_type = if let Some(text) = text_content {
+            let text_lower = text.to_lowercase();
+            if text_lower.contains("submit") || text_lower.contains("apply") || text_lower.contains("send") {
+                "submit"
+            } else if text_lower.contains("login") || text_lower.contains("sign in") {
+                "login"
+            } else if text_lower.contains("accept") || text_lower.contains("agree") {
+                "accept"
+            } else {
+                "button"
+            }
+        } else {
+            "button"
+        };
+        
+        self.elements.entry(button_type.to_string()).or_insert_with(Vec::new).extend(selectors);
+    }
+    
+    fn parse_select_element(&mut self, line: &str) {
+        let id = self.extract_attribute(line, "id");
+        let name = self.extract_attribute(line, "name");
+        
+        let mut selectors = Vec::new();
+        if let Some(id) = id {
+            selectors.push(format!("#{}", id));
+        }
+        if let Some(name) = name {
+            selectors.push(format!("[name=\"{}\"]", name));
+        }
+        
+        self.elements.entry("select".to_string()).or_insert_with(Vec::new).extend(selectors);
+    }
+    
+    fn extract_attribute(&self, line: &str, attr: &str) -> Option<String> {
+        let pattern = format!("{}=\"", attr);
+        if let Some(start) = line.find(&pattern) {
+            let start = start + pattern.len();
+            if let Some(end) = line[start..].find('"') {
+                return Some(line[start..start + end].to_string());
+            }
+        }
+        None
+    }
+    
+    fn extract_text_content(&self, line: &str) -> Option<String> {
+        if let Some(start) = line.find('>') {
+            if let Some(end) = line[start + 1..].find('<') {
+                let content = line[start + 1..start + 1 + end].trim();
+                if !content.is_empty() {
+                    return Some(content.to_string());
+                }
+            }
+        }
+        None
+    }
+    
+    fn find_cookie_consent(&self) -> Option<String> {
+        // Look for common cookie consent patterns
+        let cookie_patterns = [
+            "accept", "cookie", "consent", "agree", "ok", "got it"
+        ];
+        
+        for pattern in &cookie_patterns {
+            if let Some(selectors) = self.elements.get(pattern) {
+                if !selectors.is_empty() {
+                    return Some(selectors[0].clone());
+                }
+            }
+        }
+        
+        // Check for common cookie button IDs/classes
+        if self.html.contains("accept-cookie") || self.html.contains("cookie-accept") {
+            return Some("#accept-cookies".to_string());
+        }
+        
+        None
+    }
+    
+    fn is_login_form(&self) -> bool {
+        self.elements.contains_key("password") && 
+        (self.elements.contains_key("text") || self.elements.contains_key("email"))
+    }
+    
+    fn find_submit_button(&self) -> Option<String> {
+        if let Some(selectors) = self.elements.get("submit") {
+            if !selectors.is_empty() {
+                return Some(selectors[0].clone());
+            }
+        }
+        
+        // Fallback to common submit button selectors
+        let common_submits = [
+            "[type=\"submit\"]", "#submit", "#apply", "#send", ".submit", ".apply"
+        ];
+        
+        for selector in &common_submits {
+            if self.html.contains(&selector.replace("#", "id=\"").replace(".", "class=\"")) {
+                return Some(selector.to_string());
+            }
+        }
+        
+        None
+    }
+    
+    fn get_elements_by_type(&self, element_type: &str) -> Vec<String> {
+        self.elements.get(element_type).cloned().unwrap_or_default()
+    }
+}
+
+fn generate_login_sequence(analyzer: &FormAnalyzer, user_data: &Value) -> Option<Vec<String>> {
+    let mut actions = Vec::new();
+    
+    // Find username/email field
+    let username_selectors = analyzer.get_elements_by_type("text");
+    let email_selectors = analyzer.get_elements_by_type("email");
+    
+    let username_field = username_selectors.first()
+        .or_else(|| email_selectors.first());
+    
+    // Find password field
+    let password_selectors = analyzer.get_elements_by_type("password");
+    let password_field = password_selectors.first();
+    
+    if let (Some(username_sel), Some(password_sel)) = (username_field, password_field) {
+        // Use email if available, otherwise username
+        if let Some(email) = user_data.get("email").and_then(|v| v.as_str()) {
+            if !email.is_empty() {
+                actions.push(format!("type \"{}\" \"{}\"", username_sel, escape_for_dsl(email)));
+            }
+        } else if let Some(username) = user_data.get("username").and_then(|v| v.as_str()) {
+            if !username.is_empty() {
+                actions.push(format!("type \"{}\" \"{}\"", username_sel, escape_for_dsl(username)));
+            }
+        }
+        
+        if let Some(password) = user_data.get("password").and_then(|v| v.as_str()) {
+            if !password.is_empty() {
+                actions.push(format!("type \"{}\" \"{}\"", password_sel, escape_for_dsl(password)));
+            }
+        }
+        
+        // Find and click login button
+        if let Some(login_btn) = analyzer.elements.get("login") {
+            if let Some(selector) = login_btn.first() {
+                actions.push(format!("click \"{}\"", selector));
+            }
+        }
+        
+        return Some(actions);
+    }
+    
+    None
+}
+
+fn generate_field_filling_sequence(analyzer: &FormAnalyzer, user_data: &Value) -> Vec<String> {
+    let mut actions = Vec::new();
+    
+    // Enhanced field mappings with smarter detection
+    let field_mappings = [
+        ("fullname", vec!["text"], vec!["fullname", "full-name", "name", "firstname", "first-name"]),
+        ("email", vec!["email", "text"], vec!["email", "e-mail", "mail"]),
+        ("phone", vec!["tel", "text"], vec!["phone", "telephone", "tel", "mobile"]),
+        ("username", vec!["text"], vec!["username", "user", "login"]),
+    ];
+    
+    for (data_key, input_types, field_names) in &field_mappings {
+        if let Some(value) = user_data.get(*data_key).and_then(|v| v.as_str()) {
+            if !value.is_empty() {
+                // Try to find matching field
+                for input_type in input_types {
+                    if let Some(selectors) = analyzer.elements.get(*input_type) {
+                        for selector in selectors {
+                            // Check if selector matches field names
+                            let selector_lower = selector.to_lowercase();
+                            let matches = field_names.iter().any(|name| selector_lower.contains(name));
+                            
+                            if matches {
+                                actions.push(format!("type \"{}\" \"{}\"", selector, escape_for_dsl(value)));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    actions
+}
+
+fn generate_upload_sequence(analyzer: &FormAnalyzer, user_data: &Value) -> Option<Vec<String>> {
+    if let Some(cv_path) = user_data.get("cv_path").and_then(|v| v.as_str()) {
+        if !cv_path.is_empty() {
+            // Find file input
+            if let Some(file_selectors) = analyzer.elements.get("file") {
+                if let Some(selector) = file_selectors.first() {
+                    return Some(vec![format!("upload \"{}\" \"{}\"", selector, escape_for_dsl(cv_path))]);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn generate_checkbox_sequence(analyzer: &FormAnalyzer) -> Vec<String> {
+    let mut actions = Vec::new();
+    
+    // Look for common agreement checkboxes
+    if let Some(checkbox_selectors) = analyzer.elements.get("checkbox") {
+        for selector in checkbox_selectors {
+            let selector_lower = selector.to_lowercase();
+            if selector_lower.contains("terms") || 
+               selector_lower.contains("agree") || 
+               selector_lower.contains("consent") ||
+               selector_lower.contains("gdpr") {
+                actions.push(format!("click \"{}\"", selector));
+            }
+        }
+    }
+    
+    actions
 }
 
 fn is_complex_form(html: &str) -> bool {
