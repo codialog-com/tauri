@@ -179,11 +179,140 @@ serve-docs: ## Serve documentation (if available)
 		echo "$(RED)No docs directory found$(NC)"; \
 	fi
 
+# Docker and Services Management
+docker-up: ## Start all Docker services (PostgreSQL, Redis, Vaultwarden, Bitwarden CLI)
+	@echo "$(YELLOW)Starting Docker services...$(NC)"
+	./scripts/init/docker-setup.sh
+
+docker-down: ## Stop all Docker services
+	@echo "$(YELLOW)Stopping Docker services...$(NC)"
+	docker-compose -f docker-compose.bitwarden.yml down
+
+docker-restart: docker-down docker-up ## Restart all Docker services
+
+docker-logs: ## Show logs from all Docker services
+	docker-compose -f docker-compose.bitwarden.yml logs -f
+
+docker-status: ## Check status of all Docker services
+	@echo "$(YELLOW)Docker Services Status:$(NC)"
+	@docker-compose -f docker-compose.bitwarden.yml ps
+
+docker-clean: ## Clean Docker containers, volumes, and networks
+	@echo "$(YELLOW)Cleaning Docker resources...$(NC)"
+	docker-compose -f docker-compose.bitwarden.yml down -v
+	docker volume prune -f
+	docker network prune -f
+	@echo "$(GREEN)Docker resources cleaned$(NC)"
+
+# Database Management
+db-migrate: ## Run database migrations
+	@echo "$(YELLOW)Running database migrations...$(NC)"
+	@if docker ps | grep -q codialog-postgres; then \
+		docker exec -i codialog-postgres psql -U $${POSTGRES_USER:-codialog} -d $${POSTGRES_DB:-codialog} < src-tauri/migrations/001_initial.sql; \
+		echo "$(GREEN)Database migrations completed$(NC)"; \
+	else \
+		echo "$(RED)PostgreSQL container not running. Start with 'make docker-up'$(NC)"; \
+	fi
+
+db-reset: ## Reset database (drop and recreate schema)
+	@echo "$(YELLOW)Resetting database...$(NC)"
+	@if docker ps | grep -q codialog-postgres; then \
+		docker exec codialog-postgres dropdb -U $${POSTGRES_USER:-codialog} $${POSTGRES_DB:-codialog} --if-exists; \
+		docker exec codialog-postgres createdb -U $${POSTGRES_USER:-codialog} $${POSTGRES_DB:-codialog}; \
+		make db-migrate; \
+		echo "$(GREEN)Database reset completed$(NC)"; \
+	else \
+		echo "$(RED)PostgreSQL container not running$(NC)"; \
+	fi
+
+db-backup: ## Create database backup
+	@echo "$(YELLOW)Creating database backup...$(NC)"
+	@mkdir -p data/backups
+	@docker exec codialog-postgres pg_dump -U $${POSTGRES_USER:-codialog} $${POSTGRES_DB:-codialog} > data/backups/backup_$$(date +%Y%m%d_%H%M%S).sql
+	@echo "$(GREEN)Database backup created in data/backups/$(NC)"
+
+# Bitwarden Management  
+bw-status: ## Check Bitwarden CLI status
+	@echo "$(YELLOW)Checking Bitwarden status...$(NC)"
+	@if docker ps | grep -q codialog-bitwarden-cli; then \
+		docker exec codialog-bitwarden-cli bw status; \
+	else \
+		echo "$(RED)Bitwarden CLI container not running$(NC)"; \
+	fi
+
+bw-sync: ## Sync Bitwarden vault
+	@echo "$(YELLOW)Syncing Bitwarden vault...$(NC)"
+	@docker exec codialog-bitwarden-cli bw sync
+
+bw-unlock: ## Unlock Bitwarden vault (requires master password)
+	@echo "$(YELLOW)Unlocking Bitwarden vault...$(NC)"
+	@docker exec -it codialog-bitwarden-cli bw unlock
+
+# Application Setup and Management
+init: ## Initialize application (complete setup)
+	@echo "$(YELLOW)Initializing Codialog application...$(NC)"
+	./scripts/init/setup.sh
+
+init-docker: ## Initialize Docker environment only
+	./scripts/init/docker-setup.sh
+
+# Development with Services
+dev-full: docker-up dev ## Start all services and development server
+
+# Health Checks Enhanced
+health-all: ## Check health of all services (app + Docker)
+	@echo "$(YELLOW)Checking all service health...$(NC)"
+	@make health
+	@echo ""
+	@make docker-status
+	@echo ""
+	@curl -s http://localhost:8080/alive >/dev/null && \
+		echo "$(GREEN)✓ Vaultwarden (port 8080)$(NC)" || \
+		echo "$(RED)✗ Vaultwarden not accessible$(NC)"
+
+# Logs Management
+logs-app: ## Show application logs only
+	@echo "$(YELLOW)Application logs:$(NC)"
+	@find logs -name "*.log" -exec tail -f {} +
+
+logs-docker: ## Show Docker service logs
+	make docker-logs
+
+logs-all: ## Show all logs (app + Docker)
+	@echo "$(YELLOW)Starting log monitoring (Ctrl+C to stop)...$(NC)"
+	@make logs-app & make logs-docker
+
 # Environment management
 env-check: ## Validate environment configuration  
 	@echo "$(YELLOW)Checking environment...$(NC)"
 	@if [ ! -f ".env" ]; then \
-		echo "$(RED)No .env file found. Run 'make setup' first$(NC)"; \
+		echo "$(RED)No .env file found. Run 'make init' first$(NC)"; \
 		exit 1; \
 	fi
 	@echo "$(GREEN)Environment configuration found$(NC)"
+
+env-template: ## Create .env from template
+	@if [ ! -f ".env" ]; then \
+		cp .env.example .env; \
+		echo "$(GREEN)Created .env from template$(NC)"; \
+	else \
+		echo "$(YELLOW).env already exists$(NC)"; \
+	fi
+
+# Data Management
+data-clean: ## Clean application data (uploads, logs, sessions)
+	@echo "$(YELLOW)Cleaning application data...$(NC)"
+	rm -rf data/uploads/* data/sessions/* data/logs/* 2>/dev/null || true
+	rm -rf src-tauri/data/uploads/* src-tauri/data/sessions/* src-tauri/data/logs/* 2>/dev/null || true
+	@echo "$(GREEN)Application data cleaned$(NC)"
+
+data-backup: ## Backup application data
+	@echo "$(YELLOW)Creating data backup...$(NC)"
+	@mkdir -p data/backups
+	@tar -czf data/backups/data_backup_$$(date +%Y%m%d_%H%M%S).tar.gz data/ src-tauri/data/
+	@echo "$(GREEN)Data backup created in data/backups/$(NC)"
+
+# Quick Commands
+full-reset: docker-down clean data-clean init docker-up ## Complete reset (clean everything and reinitialize)
+
+quick-start: init docker-up dev ## Quick start for new users (complete setup and run)
