@@ -17,7 +17,7 @@ use axum::{
     routing::{get, post},
     Router,
     extract::{Json, State, Query},
-    response::Json as ResponseJson,
+    response::{Json as ResponseJson, IntoResponse},
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
@@ -363,7 +363,7 @@ async fn clear_logs(
 async fn bitwarden_login(
     Json(payload): Json<BitwardenLoginRequest>,
     State(state): State<AppState>,
-) -> Result<ResponseJson<SessionResponse>, StatusCode> {
+) -> Json<SessionResponse> {
     info!("Bitwarden login attempt for user: {}", payload.email);
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
@@ -376,29 +376,29 @@ async fn bitwarden_login(
             let user_data = UserData::default();
             match state.session_manager.create_session(&payload.email, user_data).await {
                 Ok(session) => {
-                    Ok(ResponseJson(SessionResponse {
+                    Json(SessionResponse {
                         success: true,
                         session: Some(session),
                         error: None,
-                    }))
+                    })
                 }
                 Err(e) => {
                     error!("Failed to create session: {}", e);
-                    Ok(ResponseJson(SessionResponse {
+                    Json(SessionResponse {
                         success: false,
                         session: None,
                         error: Some(format!("Failed to create session: {}", e)),
-                    }))
+                    })
                 }
             }
         }
         Err(e) => {
             error!("Bitwarden login failed: {}", e);
-            Ok(ResponseJson(SessionResponse {
+            Json(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Bitwarden login failed: {}", e)),
-            }))
+            })
         }
     }
 }
@@ -407,7 +407,7 @@ async fn bitwarden_login(
 async fn bitwarden_unlock(
     Json(payload): Json<BitwardenUnlockRequest>,
     State(state): State<AppState>,
-) -> Result<ResponseJson<serde_json::Value>, StatusCode> {
+) -> Json<serde_json::Value> {
     info!("Bitwarden vault unlock attempt");
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
@@ -415,14 +415,14 @@ async fn bitwarden_unlock(
     match bitwarden.unlock(&payload.master_password).await {
         Ok(()) => {
             info!("Bitwarden vault unlocked successfully");
-            ResponseJson(serde_json::json!({
+            Json(serde_json::json!({
                 "success": true,
                 "message": "Vault unlocked successfully"
             }))
         }
         Err(e) => {
             error!("Failed to unlock Bitwarden vault: {}", e);
-            ResponseJson(serde_json::json!({
+            Json(serde_json::json!({
                 "success": false,
                 "error": format!("Failed to unlock vault: {}", e)
             }))
@@ -492,7 +492,7 @@ async fn get_credentials_for_url(
 async fn create_session(
     Json(payload): Json<SessionRequest>,
     State(state): State<AppState>,
-) -> ResponseJson<SessionResponse> {
+) -> impl IntoResponse {
     info!("Creating session for user: {}", payload.user_id);
     
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
