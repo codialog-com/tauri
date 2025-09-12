@@ -21,6 +21,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value as JsonValue};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -413,7 +414,7 @@ async fn bitwarden_unlock(
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
     
-    match bitwarden.unlock(&payload.password).await {
+    match bitwarden.unlock(&payload.master_password).await {
         Ok(()) => {
             info!("Bitwarden vault unlocked successfully");
             Ok::<_, axum::response::Response>(Json(json!({
@@ -480,7 +481,7 @@ async fn get_credentials_for_url(
     let bitwarden = state.bitwarden_manager.lock().await;
     
     match bitwarden.get_credentials_for_url(&url).await {
-        Ok(credentials: Vec<Credential>) => {
+        Ok(credentials) => {
             info!("Found {} credentials for URL: {}", credentials.len(), url);
             Ok::<_, axum::response::Response>(Json(CredentialsResponse {
                 success: true,
@@ -515,7 +516,7 @@ async fn create_session(
     info!("Creating session for user: {}", payload.user_id);
     
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
-        Ok(session: Session) => {
+        Ok(session) => {
             info!("Session created/updated successfully: {}", session.session_id);
             Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: true,
@@ -540,10 +541,10 @@ async fn get_session(
     let session_id = match params.get("session_id") {
         Some(id) if !id.trim().is_empty() => id.clone(),
         _ => {
-            return Ok(Json(SessionResponse {
+            return Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: false,
                 session: None,
-                error: Some("session_id parameter is required".to_string()),
+                error: Some("Session ID is required".to_string()),
             }));
         }
     };
@@ -553,26 +554,26 @@ async fn get_session(
     match state.session_manager.get_session(&session_id).await {
         Ok(Some(session)) => {
             info!("Session found: {}", session_id);
-            Ok(Json(SessionResponse {
+            Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: true,
                 session: Some(session),
                 error: None,
             }))
         }
         Ok(None) => {
-            warn!("Session not found: {}", session_id);
-            Ok(Json(SessionResponse {
+            info!("Session not found: {}", session_id);
+            Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: false,
                 session: None,
-                error: Some("Session not found or expired".to_string()),
+                error: Some("Session not found".to_string()),
             }))
         }
         Err(e) => {
-            error!("Failed to retrieve session: {}", e);
-            Ok(Json(SessionResponse {
+            error!("Error retrieving session: {}", e);
+            Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: false,
                 session: None,
-                error: Some(format!("Failed to retrieve session: {}", e)),
+                error: Some(format!("Error retrieving session: {}", e)),
             }))
         }
     }
