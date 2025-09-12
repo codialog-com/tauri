@@ -79,6 +79,7 @@ System jest w pełni skonteneryzowany, co sprawia, że uruchomienie go jest niez
    ```bash
    git clone https://github.com/codialog/tauri
    cd tauri
+   make install
    ```
 
 2. Uruchom wszystkie usługi za pomocą jednego polecenia:

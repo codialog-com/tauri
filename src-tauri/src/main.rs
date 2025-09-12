@@ -16,15 +16,14 @@ mod tests;
 use axum::{
     routing::{get, post},
     Router,
-    Json,
-    extract::State,
-    extract::Query,
+    extract::{Json, State, Query},
     response::Json as ResponseJson,
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
 use tracing::{info, error, warn, debug, instrument, span, Level};
 use logging::LogManager;
 use bitwarden::{BitwardenManager, BitwardenCredential};
@@ -364,7 +363,7 @@ async fn clear_logs(
 async fn bitwarden_login(
     Json(payload): Json<BitwardenLoginRequest>,
     State(state): State<AppState>,
-) -> Json<SessionResponse> {
+) -> ResponseJson<SessionResponse> {
     info!("Bitwarden login attempt for user: {}", payload.email);
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
@@ -377,7 +376,7 @@ async fn bitwarden_login(
             let user_data = UserData::default();
             match state.session_manager.create_session(&payload.email, user_data).await {
                 Ok(session) => {
-                    Json(SessionResponse {
+                    ResponseJson(SessionResponse {
                         success: true,
                         session: Some(session),
                         error: None,
@@ -385,7 +384,7 @@ async fn bitwarden_login(
                 }
                 Err(e) => {
                     error!("Failed to create session: {}", e);
-                    Json(SessionResponse {
+                    ResponseJson(SessionResponse {
                         success: false,
                         session: None,
                         error: Some(format!("Failed to create session: {}", e)),
@@ -395,7 +394,7 @@ async fn bitwarden_login(
         }
         Err(e) => {
             error!("Bitwarden login failed: {}", e);
-            Json(SessionResponse {
+            ResponseJson(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Bitwarden login failed: {}", e)),
