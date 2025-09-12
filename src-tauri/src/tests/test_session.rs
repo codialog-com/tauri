@@ -1,9 +1,13 @@
-#[cfg(test)]
+#![cfg(test)]
+
+use super::*;
+use crate::session::*;
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use tokio::test;
+
 mod tests {
-    use super::super::session::*;
-    use super::common::*;
-    use serde_json::json;
-    use tokio_test;
+    use super::*;
     use uuid::Uuid;
 
     #[tokio::test]

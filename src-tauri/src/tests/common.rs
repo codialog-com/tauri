@@ -87,8 +87,11 @@ pub async fn setup_test_database() -> sqlx::PgPool {
         .expect("Failed to create test database pool");
     
     // Run migrations
-    sqlx::migrate!("./migrations")
-        .run(&pool)
+    let migrator = sqlx::migrate::Migrator::new(std::path::Path::new("./migrations"))
+        .await
+        .expect("Failed to create migrator");
+    
+    migrator.run(&pool)
         .await
         .expect("Failed to run migrations");
     

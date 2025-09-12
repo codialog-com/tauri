@@ -1,9 +1,14 @@
-#[cfg(test)]
+#![cfg(test)]
+
+use super::*;
+use crate::database::*;
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use sqlx::{query, query_as};
+use tokio::test;
+
 mod tests {
-    use super::super::database::*;
-    use super::common::*;
-    use serde_json::json;
-    use tokio_test;
+    use super::*;
     use sqlx::{PgPool, Row};
 
     #[tokio::test]

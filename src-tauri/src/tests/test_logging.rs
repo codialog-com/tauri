@@ -1,9 +1,13 @@
-#[cfg(test)]
+#![cfg(test)]
+
+use super::*;
+use crate::logging::*;
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use tokio::test;
+
 mod tests {
-    use super::super::logging::*;
-    use super::common::*;
-    use serde_json::json;
-    use tokio_test;
+    use super::*;
     use std::fs;
     use std::path::Path;
     use tracing::{info, warn, error, debug};

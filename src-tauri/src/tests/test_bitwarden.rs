@@ -1,9 +1,13 @@
-#[cfg(test)]
+#![cfg(test)]
+
+use super::*;
+use crate::bitwarden::*;
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use tokio::test;
+
 mod tests {
-    use super::super::bitwarden::*;
-    use super::common::*;
-    use tokio_test;
-    use std::process::Command;
+    use super::*;
 
     #[test]
     fn test_bitwarden_credential_creation() {

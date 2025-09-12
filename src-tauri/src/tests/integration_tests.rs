@@ -1,9 +1,20 @@
-#[cfg(test)]
-mod integration_tests {
-    use super::super::*;
-    use super::common::*;
-    use serde_json::json;
-    use tokio_test;
+#![cfg(test)]
+
+use super::*;
+use crate::{
+    bitwarden::*,
+    session::*,
+    logging::*,
+    llm::*,
+    database::*,
+};
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use sqlx::{query, query_as};
+use tokio::test;
+
+mod tests {
+    use super::*;
     use std::time::Duration;
 
     #[tokio::test]
