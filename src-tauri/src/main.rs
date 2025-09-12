@@ -499,7 +499,7 @@ async fn create_session(
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
         Ok(session) => {
             info!("Session created successfully: {}", session.session_id);
-            Json(SessionResponse {
+            Ok(Json(SessionResponse {
                 success: true,
                 session: Some(session),
 async fn get_session(
