@@ -369,6 +369,28 @@ async fn bitwarden_login(
     let mut bitwarden = state.bitwarden_manager.lock().await;
     
     match bitwarden.login(&payload.email, &payload.master_password).await {
+        Ok(()) => {
+            info!("Bitwarden login successful for: {}", payload.email);
+            
+            // Create user session
+            let user_data = UserData::default();
+            match state.session_manager.create_session(&payload.email, user_data).await {
+                Ok(session) => {
+                    info!("Session created successfully: {}", session.session_id);
+                    Ok(Json(SessionResponse {
+                        success: true,
+                        session: Some(session),
+                        error: None,
+                    }))
+                }
+                Err(e) => {
+                    error!("Failed to create session: {}", e);
+                    Ok(Json(SessionResponse {
+                        success: false,
+                        session: None,
+                        error: Some(format!("Failed to create session: {}", e)),
+                    }))
+                }
             }
         }
         Err(e) => {
