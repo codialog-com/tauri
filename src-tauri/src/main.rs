@@ -498,7 +498,7 @@ async fn create_session(
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
         Ok(session) => {
             info!("Session created successfully: {}", session.session_id);
-            Json(SessionResponse {
+            ResponseJson(SessionResponse {
                 success: true,
                 session: Some(session),
                 error: None,
@@ -506,7 +506,7 @@ async fn create_session(
         }
         Err(e) => {
             error!("Failed to create session: {}", e);
-            Json(SessionResponse {
+            ResponseJson(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Failed to create session: {}", e)),
