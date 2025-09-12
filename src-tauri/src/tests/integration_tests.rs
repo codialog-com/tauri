@@ -8,9 +8,35 @@ use sqlx::query as sqlx_query;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
+    use crate::{
+        bitwarden::{
+            BitwardenManager,
+            check_bitwarden_status,
+            parse_bitwarden_credentials,
+            bitwarden_login,
+        },
+        session::{
+            SessionManager,
+            create_user_session,
+            get_user_session,
+            expire_user_session,
+            cleanup_expired_sessions,
+            validate_session,
+            update_user_session,
+            get_session_metrics,
+        },
+        database::setup_test_database,
+        logging::{
+            LogManager,
+            log_user_action,
+            get_application_logs,
+        },
+    };
+    use serde_json::json;
     use std::sync::Arc;
     use tokio::sync::Mutex;
+    use uuid::Uuid;
+    use chrono::{Utc, Duration};
 
     #[tokio::test]
     async fn test_full_bitwarden_dsl_workflow() {
