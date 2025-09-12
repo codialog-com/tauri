@@ -1,13 +1,18 @@
+#![cfg(test)]
+
 use super::*;
 use pretty_assertions::assert_eq;
 use serde_json::json;
-use tokio::test;
 
-// Mock FormAnalyzer for testing
-struct MockFormAnalyzer {
-    is_login: bool,
-    has_file_input: bool,
-}
+mod tests {
+    use super::*;
+    use crate::tagui::FormAnalyzerTrait;
+
+    // Mock FormAnalyzer for testing
+    struct MockFormAnalyzer {
+        is_login: bool,
+        has_file_input: bool,
+    }
 
 impl MockFormAnalyzer {
     fn new() -> Self {
