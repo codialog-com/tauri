@@ -1,14 +1,11 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "productName": "Codialog",
+  "version": "0.1.0",
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
-    "devPath": "../src",
-    "distDir": "../src"
-  },
-  "package": {
-    "productName": "Codialog",
-    "version": "0.1.0"
+    "frontendDist": "../src"
   },
   "tauri": {
     "bundle": {
