@@ -1,16 +1,15 @@
 #![cfg(test)]
 
-use super::{
-    bitwarden::*,
-    llm::*,
-    logging::*,
-    session::*,
-    database::*,
-    common::*,
-};
-use serde_json::json;
-use sqlx::query as sqlx_query;
+use super::*;
+use pretty_assertions::assert_eq;
 use std::time::Duration;
+use crate::{
+    bitwarden::BitwardenManager,
+    session::{SessionManager, UserSession, UserData},
+    logging::LogManager,
+};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[cfg(test)]
 mod tests {

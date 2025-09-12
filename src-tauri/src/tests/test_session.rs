@@ -1,10 +1,11 @@
 #![cfg(test)]
 
-use super::{
-    session::*,
-    common::*,
-};
-use serde_json::json;
+use super::*;
+use pretty_assertions::assert_eq;
+use crate::session::{SessionManager, UserSession, UserData};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[cfg(test)]
 mod tests {

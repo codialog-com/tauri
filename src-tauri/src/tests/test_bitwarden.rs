@@ -1,10 +1,10 @@
 #![cfg(test)]
 
-use super::{
-    bitwarden::*,
-    common::*,
-};
-use serde_json::json;
+use super::*;
+use pretty_assertions::assert_eq;
+use crate::bitwarden::BitwardenManager;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[cfg(test)]
 mod tests {

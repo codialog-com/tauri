@@ -5,12 +5,14 @@ use super::{
     common::*,
 };
 use serde_json::json;
+use pretty_assertions::assert_eq;
+use sqlx::{PgPool, Row};
+use std::env;
+use std::time::Duration;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Using fully qualified path for assert_eq to avoid ambiguity
-    use sqlx::{PgPool, Row, query as sqlx_query};
 
     #[tokio::test]
     async fn test_database_connection() {
