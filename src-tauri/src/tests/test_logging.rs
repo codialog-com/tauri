@@ -12,6 +12,7 @@ mod tests {
     // Using fully qualified path for assert_eq to avoid ambiguity
     use std::fs;
     use tracing::{info, warn, error, debug};
+    use serde_json::json;
 
     #[tokio::test]
     async fn test_log_file_creation() {
