@@ -480,25 +480,10 @@ async fn create_session(
             Json(SessionResponse {
                 success: true,
                 session: Some(session),
-                error: None,
-            })
-        }
-        Err(e) => {
-            error!("Failed to create session: {}", e);
-            Json(SessionResponse {
-                success: false,
-                session: None,
-                error: Some(format!("Failed to create session: {}", e)),
-            })
-        }
-    }
-}
-
-// Endpoint do pobierania sesji
 async fn get_session(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
-) -> Json<SessionResponse> {
+) -> Result<Json<SessionResponse>, impl IntoResponse> {
     let session_id = params.get("session_id").cloned().unwrap_or_default();
     info!("Retrieving session: {}", session_id);
     
@@ -513,11 +498,11 @@ async fn get_session(
         }
         Ok(None) => {
             warn!("Session not found: {}", session_id);
-            Json(SessionResponse {
+            Ok(Json(SessionResponse {
                 success: false,
                 session: None,
                 error: Some("Session not found or expired".to_string()),
-            })
+            }))
         }
         Err(e) => {
             error!("Failed to retrieve session: {}", e);
