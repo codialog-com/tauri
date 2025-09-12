@@ -15,6 +15,7 @@ use crate::{
     },
     database::setup_test_database,
 };
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -27,7 +28,7 @@ mod tests {
     
     // Helper function to create test user data
     fn create_test_user_data() -> serde_json::Value {
-        serde_json::json!({
+        json!({
             "user_id": Uuid::new_v4().to_string(),
             "email": "test@example.com",
             "name": "Test User",
