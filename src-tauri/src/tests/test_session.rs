@@ -4,7 +4,6 @@ use super::*;
 use pretty_assertions::assert_eq;
 use crate::{
     session::{
-        SessionManager,
         create_user_session,
         get_user_session,
         expire_user_session,
@@ -17,7 +16,6 @@ use crate::{
 };
 use serde_json::json;
 use uuid::Uuid;
-use chrono::Utc;
 
 #[cfg(test)]
 mod tests {

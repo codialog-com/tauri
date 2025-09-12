@@ -4,7 +4,6 @@ use super::*;
 use pretty_assertions::assert_eq;
 use crate::{
     logging::{
-        LogManager,
         initialize_logging_system,
         log_user_action,
         get_application_logs,
@@ -18,9 +17,7 @@ use crate::{
     },
     database::setup_test_database,
 };
-use std::path::PathBuf;
 use tempfile::tempdir;
-use chrono::Utc;
 use serde_json::json;
 
 #[cfg(test)]

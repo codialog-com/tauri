@@ -2,8 +2,12 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
-use sqlx::{PgPool, Row, postgres::PgPoolOptions};
-use std::time::Duration;
+use crate::database::{
+    setup_test_database,
+    get_db_pool,
+    run_migrations,
+    execute_sql,
+};
 use uuid::Uuid;
 
 // Helper function to create a test database connection
