@@ -8,8 +8,10 @@ use super::{
 };
 use sqlx::{PgPool, Row, query as sqlx_query};
 
+#[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
     use sqlx::{PgPool, Row};
 
     #[tokio::test]

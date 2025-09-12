@@ -4,16 +4,18 @@ use super::{
     logging::*,
     common::*,
     pretty_assertions::assert_eq,
+    serde_json::json,
 };
 use std::path::Path;
 use std::fs;
 use tracing::{info, warn, error, debug};
-use serde_json::json;
 
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
+    use std::fs;
     use tracing::{info, warn, error, debug};
 
     #[tokio::test]
