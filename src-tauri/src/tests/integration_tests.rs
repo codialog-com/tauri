@@ -1,38 +1,63 @@
 #![cfg(test)]
 
-use super::*;
+use crate::{
+    bitwarden::{
+        check_bitwarden_status,
+        parse_bitwarden_credentials,
+        bitwarden_login,
+    },
+    session::{
+        create_user_session,
+        get_user_session,
+        expire_user_session,
+        cleanup_expired_sessions,
+        validate_session,
+        update_user_session,
+        get_session_metrics,
+    },
+    database::setup_test_database,
+    logging::{
+        setup_logging,
+        log_user_action,
+        get_application_logs,
+    },
+    dsl::generate_dsl_script,
+};
 use pretty_assertions::assert_eq;
-// Clean up unused imports
+use serde_json::json;
+use std::time::Duration;
+use tokio::time::sleep;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        bitwarden::{
-            BitwardenManager,
-            check_bitwarden_status,
-            parse_bitwarden_credentials,
-            bitwarden_login,
-        },
-        session::{
-            SessionManager,
-            create_user_session,
-            get_user_session,
-            expire_user_session,
-            cleanup_expired_sessions,
-            validate_session,
-            update_user_session,
-            get_session_metrics,
-        },
-        database::setup_test_database,
-        logging::{
-            LogManager,
-            log_user_action,
-            get_application_logs,
-        },
-    };
-    use serde_json::json;
-    // Clean up unused imports
+
+    // Helper function to create test HTML form
+    fn create_test_html_form() -> String {
+        r#"
+        <html>
+            <body>
+                <form id="login-form">
+                    <input type="text" name="username" placeholder="Username">
+                    <input type="password" name="password" placeholder="Password">
+                    <button type="submit">Login</button>
+                </form>
+            </body>
+        </html>
+        "#.to_string()
+    }
+
+    // Helper function to create test user data
+    fn create_test_user_data() -> serde_json::Value {
+        json!({
+            "user_id": "test-user-123",
+            "email": "test@example.com",
+            "preferences": {
+                "theme": "dark",
+                "language": "en"
+            }
+        })
+    }
 
     #[tokio::test]
     async fn test_full_bitwarden_dsl_workflow() {
@@ -43,12 +68,12 @@ mod tests {
         // Test complete workflow: Bitwarden + DSL generation + Session management
         
         // 1. Create user session
-        let session = session::create_user_session(&pool, &user_data).await;
+        let session = create_user_session(&pool, &user_data).await;
         assert!(session.is_ok(), "Should create user session");
         let session = session.unwrap();
         
-        // 2. Generate DSL script with caching
-        let dsl_script = llm::generate_dsl_script_with_cache(&html, &user_data, Some(&pool)).await;
+        // 2. Generate DSL script
+        let dsl_script = generate_dsl_script(&html, &user_data).await;
         assert!(!dsl_script.is_empty(), "Should generate DSL script");
         assert!(dsl_script.contains("type"), "DSL should contain type commands");
         
@@ -59,11 +84,11 @@ mod tests {
             "automation_status": "ready"
         });
         
-        let session_update = session::update_user_session(&pool, &session.session_id, &automation_data).await;
+        let session_update = update_user_session(&pool, &session.session_id, &automation_data).await;
         assert!(session_update.is_ok(), "Should update session with automation data");
         
         // 4. Retrieve updated session
-        let retrieved_session = session::get_user_session(&pool, &session.session_id).await;
+        let retrieved_session = get_user_session(&pool, &session.session_id).await;
         assert!(retrieved_session.is_ok(), "Should retrieve updated session");
         assert!(retrieved_session.unwrap().is_some(), "Session should exist");
     }
@@ -73,7 +98,7 @@ mod tests {
         // Test Bitwarden CLI integration workflow
         
         // 1. Check Bitwarden status
-        let status = bitwarden::check_bitwarden_status().await;
+        let status = check_bitwarden_status().await;
         assert!(!status.is_empty(), "Should return Bitwarden status");
         
         // 2. Test credential parsing (with mock data)
@@ -89,7 +114,7 @@ mod tests {
             }
         ]"#;
         
-        let credentials = bitwarden::parse_bitwarden_credentials(mock_credentials_json);
+        let credentials = super::bitwarden::parse_bitwarden_credentials(mock_credentials_json).unwrap_or_default();
         assert_eq!(credentials.len(), 1, "Should parse credentials correctly");
         assert_eq!(credentials[0].username.as_ref().unwrap(), "user1@example.com");
         
@@ -110,36 +135,41 @@ mod tests {
         // Test integrated logging across components
         
         // 1. Log Bitwarden operation
-        logging::log_system_event(&pool, "bitwarden", "info", &json!({
-            "operation": "vault_unlock",
-            "status": "success",
-            "items_count": 15
-        })).await.expect("Should log Bitwarden event");
+        log_user_action(
+            &pool,
+            "test-user-123",
+            "bitwarden",
+            "vault_unlock",
+            &json!({ "status": "success", "items_count": 15 })
+        ).await.expect("Should log Bitwarden event");
         
         // 2. Log DSL generation
-        logging::log_system_event(&pool, "dsl_generator", "info", &json!({
-            "operation": "script_generation", 
-            "method": "enhanced",
-            "script_length": 150,
-            "cached": false
-        })).await.expect("Should log DSL generation event");
+        log_user_action(
+            &pool,
+            "test-user-123",
+            "dsl_generator",
+            "script_generation",
+            &json!({ "method": "enhanced", "script_length": 150, "cached": false })
+        ).await.expect("Should log DSL generation event");
         
         // 3. Log user action
-        logging::log_user_action(&pool, "test_user", "form_submission", &json!({
-            "form_type": "job_application",
-            "fields_filled": 8,
-            "success": true
-        })).await.expect("Should log user action");
+        log_user_action(
+            &pool,
+            "test-user-123",
+            "form_submission",
+            "job_application",
+            &json!({ "fields_filled": 8, "success": true })
+        ).await.expect("Should log user action");
         
         // 4. Retrieve and verify logs
-        let logs = logging::get_application_logs(&pool, Some(10), None).await;
+        let logs = get_application_logs(&pool, Some(10), None).await;
         assert!(logs.is_ok(), "Should retrieve application logs");
         
         let log_entries = logs.unwrap();
         assert!(log_entries.len() >= 3, "Should have logged all events");
         
-        // 5. Test log filtering
-        let bitwarden_logs = logging::get_logs_by_component(&pool, "bitwarden", Some(5)).await;
+        // 5. Test log filtering by component
+        let bitwarden_logs: Result<Vec<_>, _> = get_application_logs(&pool, Some(10), Some("bitwarden")).await;
         assert!(bitwarden_logs.is_ok(), "Should filter logs by component");
         
         let bw_logs = bitwarden_logs.unwrap();
