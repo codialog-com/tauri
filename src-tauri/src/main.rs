@@ -360,7 +360,6 @@ async fn clear_logs(
 }
 
 // Endpoint do logowania się do Bitwarden
-#[axum::debug_handler]
 async fn bitwarden_login(
     Json(payload): Json<BitwardenLoginRequest>,
     State(state): State<AppState>,
@@ -405,7 +404,6 @@ async fn bitwarden_login(
 }
 
 // Endpoint do odblokowywania Bitwarden vault
-#[axum::debug_handler]
 async fn bitwarden_unlock(
     Json(payload): Json<BitwardenUnlockRequest>,
     State(state): State<AppState>,
@@ -491,7 +489,6 @@ async fn get_credentials_for_url(
 }
 
 // Endpoint do tworzenia/aktualizacji sesji użytkownika
-#[axum::debug_handler]
 async fn create_session(
     Json(payload): Json<SessionRequest>,
     State(state): State<AppState>,
