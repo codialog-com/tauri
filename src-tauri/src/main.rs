@@ -363,7 +363,7 @@ async fn clear_logs(
 async fn bitwarden_login(
     Json(payload): Json<BitwardenLoginRequest>,
     State(state): State<AppState>,
-) -> ResponseJson<SessionResponse> {
+) -> Result<ResponseJson<SessionResponse>, StatusCode> {
     info!("Bitwarden login attempt for user: {}", payload.email);
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
@@ -376,29 +376,29 @@ async fn bitwarden_login(
             let user_data = UserData::default();
             match state.session_manager.create_session(&payload.email, user_data).await {
                 Ok(session) => {
-                    ResponseJson(SessionResponse {
+                    Ok(ResponseJson(SessionResponse {
                         success: true,
                         session: Some(session),
                         error: None,
-                    })
+                    }))
                 }
                 Err(e) => {
                     error!("Failed to create session: {}", e);
-                    ResponseJson(SessionResponse {
+                    Ok(ResponseJson(SessionResponse {
                         success: false,
                         session: None,
                         error: Some(format!("Failed to create session: {}", e)),
-                    })
+                    }))
                 }
             }
         }
         Err(e) => {
             error!("Bitwarden login failed: {}", e);
-            ResponseJson(SessionResponse {
+            Ok(ResponseJson(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Bitwarden login failed: {}", e)),
-            })
+            }))
         }
     }
 }
