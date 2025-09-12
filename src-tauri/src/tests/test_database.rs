@@ -1,17 +1,14 @@
 #![cfg(test)]
 
-use super::{
-    database::*,
-    common::*,
-};
-use serde_json::json;
+use super::*;
 use pretty_assertions::assert_eq;
 use sqlx::{PgPool, Row};
-use std::env;
 use std::time::Duration;
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
     use super::*;
 
     #[tokio::test]

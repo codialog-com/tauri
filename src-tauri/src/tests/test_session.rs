@@ -2,16 +2,15 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
-use crate::session::{SessionManager, UserSession, UserData};
-use std::collections::HashMap;
+use crate::session::SessionManager;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Using fully qualified path for assert_eq to avoid ambiguity
-    use uuid::Uuid;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn test_create_session() {

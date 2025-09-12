@@ -3,20 +3,14 @@
 use super::*;
 use pretty_assertions::assert_eq;
 use std::time::Duration;
-use crate::{
-    bitwarden::BitwardenManager,
-    session::{SessionManager, UserSession, UserData},
-    logging::LogManager,
-};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use sqlx::query as sqlx_query;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Using fully qualified path for assert_eq to avoid ambiguity
-    use sqlx::query as sqlx_query;
-    use std::time::Duration;
+    use pretty_assertions::assert_eq;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
 
     #[tokio::test]
     async fn test_full_bitwarden_dsl_workflow() {

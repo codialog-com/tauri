@@ -2,14 +2,12 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
-use crate::bitwarden::BitwardenManager;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::bitwarden::BitwardenCredential;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Using fully qualified path for assert_eq to avoid ambiguity
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_bitwarden_credential_creation() {
