@@ -16,10 +16,13 @@ use crate::{
     database::setup_test_database,
 };
 use serde_json::json;
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 use tokio::sync::Mutex;
 use uuid::Uuid;
-use chrono::{Utc, Duration};
+use chrono::{Utc, Duration as ChronoDuration};
 
 #[cfg(test)]
 mod tests {
