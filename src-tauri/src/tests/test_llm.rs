@@ -194,25 +194,28 @@ impl FormAnalyzerTrait for MockFormAnalyzer {
 
     #[test]
     fn test_validate_generated_script() {
-        let valid_script = r#"
+        let valid_script = r##"
             wait 2
             type "#email" "test@example.com"
             type "#password" "password123"
             click "#submit"
             wait 3
-        "#;
+        "##;
         
-        let invalid_script_quotes = r#"
+        let invalid_script_quotes = r##"
             wait 2
             type "#email" "unclosed quote
             click "#submit"
-        "#;
+        "##;
         
         let empty_script = "";
         
-        assert!(validate_generated_script(valid_script), "Valid script should pass validation");
-        assert!(!validate_generated_script(invalid_script_quotes), "Script with unbalanced quotes should fail");
-        assert!(!validate_generated_script(empty_script), "Empty script should fail validation");
+        assert!(validate_generated_script(valid_script), 
+            "Valid script should pass validation");
+        assert!(!validate_generated_script(invalid_script_quotes), 
+            "Script with unbalanced quotes should fail");
+        assert!(!validate_generated_script(empty_script), 
+            "Empty script should fail validation");
     }
 
     #[test]
@@ -222,9 +225,12 @@ impl FormAnalyzerTrait for MockFormAnalyzer {
         
         let script = generate_basic_fallback_script(&html, &user_data);
         
-        assert!(!script.is_empty(), "Fallback script should not be empty");
-        assert!(script.contains("wait"), "Fallback script should contain wait commands");
-        assert!(script.contains("// Basic fallback"), "Should contain fallback comment");
+        assert!(!script.is_empty(), 
+            "Fallback script should not be empty");
+        assert!(script.contains("wait"), 
+            "Fallback script should contain wait commands");
+        assert!(script.contains("// Basic fallback"), 
+            "Should contain fallback comment");
     }
 
     #[test]
@@ -232,11 +238,14 @@ impl FormAnalyzerTrait for MockFormAnalyzer {
         let html = "";
         let user_data = json!({});
         
-        let script = generate_emergency_fallback_script(&html, &user_data);
+        let script = generate_emergency_fallback_script(html, &user_data);
         
-        assert!(!script.is_empty(), "Emergency fallback should not be empty");
-        assert!(script.contains("// Emergency fallback"), "Should contain emergency fallback comment");
-        assert!(script.contains("wait"), "Should contain wait command");
+        assert!(!script.is_empty(), 
+            "Emergency fallback should not be empty");
+        assert!(script.contains("// Emergency fallback"), 
+            "Should contain emergency fallback comment");
+        assert!(script.contains("wait"), 
+            "Should contain wait command");
     }
 
     #[tokio::test]
@@ -244,10 +253,12 @@ impl FormAnalyzerTrait for MockFormAnalyzer {
         let empty_html = "";
         let user_data = create_test_user_data();
         
-        let script = generate_dsl_script_with_cache(&empty_html, &user_data, None).await;
+        let script = generate_dsl_script_with_cache(empty_html, &user_data, None).await;
         
-        assert!(!script.is_empty(), "Should return fallback script for empty HTML");
-        assert!(script.contains("// Basic navigation"), "Should use basic navigation fallback");
+        assert!(!script.is_empty(), 
+            "Should return fallback script for empty HTML");
+        assert!(script.contains("// Basic navigation"), 
+            "Should use basic navigation fallback");
     }
 
     #[tokio::test]
@@ -257,7 +268,8 @@ impl FormAnalyzerTrait for MockFormAnalyzer {
         
         let script = generate_dsl_script_with_cache(&html, &invalid_user_data, None).await;
         
-        assert!(!script.is_empty(), "Should handle invalid user data gracefully");
+        assert!(!script.is_empty(), 
+            "Should handle invalid user data gracefully");
     }
 
     #[test]
@@ -267,6 +279,7 @@ impl FormAnalyzerTrait for MockFormAnalyzer {
         let input_with_quotes = "Hello \"World\"";
         let escaped = escape_for_dsl(input_with_quotes);
         
-        assert!(!escaped.contains("\""), "Should escape quotes in DSL strings");
+        assert!(!escaped.contains("\""), 
+            "Should escape quotes in DSL strings");
     }
 }
