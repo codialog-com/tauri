@@ -464,7 +464,17 @@ async fn get_credentials_for_url(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
 ) -> Result<Json<CredentialsResponse>, impl IntoResponse> {
-    let url = params.get("url").cloned().unwrap_or_default();
+    let url = match params.get("url") {
+        Some(url) if !url.trim().is_empty() => url.clone(),
+        _ => {
+            return Ok(Json(CredentialsResponse {
+                success: false,
+                credentials: None,
+                error: Some("URL parameter is required".to_string()),
+            }));
+        }
+    };
+    
     info!("Retrieving credentials for URL: {}", url);
     
     let bitwarden = state.bitwarden_manager.lock().await;
@@ -479,7 +489,7 @@ async fn get_credentials_for_url(
             }))
         }
         Err(e) => {
-            error!("Failed to retrieve credentials for URL: {}", e);
+            error!("Failed to retrieve credentials for URL {}: {}", url, e);
             Ok(Json(CredentialsResponse {
                 success: false,
                 credentials: None,
@@ -494,6 +504,14 @@ async fn create_session(
     State(state): State<AppState>,
     Json(payload): Json<SessionRequest>,
 ) -> Result<Json<SessionResponse>, impl IntoResponse> {
+    if payload.user_id.trim().is_empty() {
+        return Ok(Json(SessionResponse {
+            success: false,
+            session: None,
+            error: Some("User ID cannot be empty".to_string()),
+        }));
+    }
+    
     info!("Creating session for user: {}", payload.user_id);
     
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
@@ -521,7 +539,17 @@ async fn get_session(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
 ) -> Result<Json<SessionResponse>, impl IntoResponse> {
-    let session_id = params.get("session_id").cloned().unwrap_or_default();
+    let session_id = match params.get("session_id") {
+        Some(id) if !id.trim().is_empty() => id.clone(),
+        _ => {
+            return Ok(Json(SessionResponse {
+                success: false,
+                session: None,
+                error: Some("session_id parameter is required".to_string()),
+            }));
+        }
+    };
+    
     info!("Retrieving session: {}", session_id);
     
     match state.session_manager.get_session(&session_id).await {
