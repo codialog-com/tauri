@@ -2,8 +2,7 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
-use std::time::Duration;
-use sqlx::query as sqlx_query;
+// Clean up unused imports
 
 #[cfg(test)]
 mod tests {
@@ -33,10 +32,7 @@ mod tests {
         },
     };
     use serde_json::json;
-    use std::sync::Arc;
-    use tokio::sync::Mutex;
-    use uuid::Uuid;
-    use chrono::{Utc, Duration};
+    // Clean up unused imports
 
     #[tokio::test]
     async fn test_full_bitwarden_dsl_workflow() {
@@ -349,14 +345,14 @@ mod tests {
         .expect("Should age test log entries");
         
         // Run cleanup operations
-        let session_cleanup = session::cleanup_expired_sessions(&pool).await;
+        let session_cleanup = crate::session::cleanup_expired_sessions(&pool).await;
         assert!(session_cleanup.is_ok(), "Should cleanup expired sessions");
         
         let cache_cleanup = sqlx::query("DELETE FROM dsl_scripts_cache WHERE expires_at < NOW()")
             .execute(&pool).await;
         assert!(cache_cleanup.is_ok(), "Should cleanup expired cache entries");
         
-        let log_cleanup = logging::cleanup_old_logs(&pool, 30).await;
+        let log_cleanup = crate::logging::cleanup_old_logs(&pool, 30).await;
         assert!(log_cleanup.is_ok(), "Should cleanup old logs");
         
         // Verify cleanup results
