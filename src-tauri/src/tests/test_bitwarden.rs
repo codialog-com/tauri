@@ -19,6 +19,29 @@ use uuid::Uuid;
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use std::process::Command;
+    
+    // Helper function to check Bitwarden CLI status
+    async fn check_bitwarden_status() -> Result<bool, String> {
+        let output = Command::new("bw")
+            .arg("--version")
+            .output()
+            .map_err(|e| format!("Failed to execute bw command: {}", e))?;
+        
+        if output.status.success() {
+            Ok(true)
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            Err(format!("Bitwarden CLI error: {}", error))
+        }
+    }
+    
+    // Helper function to parse Bitwarden credentials from JSON output
+    fn parse_bitwarden_credentials(json_output: &str) -> Result<Vec<BitwardenCredential>, String> {
+        serde_json::from_str(json_output)
+            .map_err(|e| format!("Failed to parse Bitwarden credentials: {}", e))
+    }
 
     // Helper function to create a test Bitwarden credential
     fn create_test_credential() -> BitwardenCredential {

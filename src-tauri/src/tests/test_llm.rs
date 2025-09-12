@@ -1,15 +1,37 @@
 #![cfg(test)]
 
-use super::{
-    llm::*,
-    common::*,
+use super::*;
+use pretty_assertions::assert_eq;
+use crate::{
+    llm::{
+        generate_dsl_script,
+        validate_dsl_script,
+        process_natural_language_query,
+        get_llm_response,
+        LLMRequest,
+        LLMResponse,
+        LLMError,
+    },
+    database::setup_test_database,
 };
 use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Using fully qualified path for assert_eq to avoid ambiguity
+    use pretty_assertions::assert_eq;
+    
+    // Helper function to create a test LLM request
+    fn create_test_llm_request() -> LLMRequest {
+        LLMRequest {
+            prompt: "Test prompt".to_string(),
+            max_tokens: Some(100),
+            temperature: Some(0.7),
+            ..Default::default()
+        }
+    }
 
     // Mock FormAnalyzer for testing
     struct MockFormAnalyzer {
