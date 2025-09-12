@@ -463,7 +463,7 @@ async fn get_credentials(
 async fn get_credentials_for_url(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
-) -> Json<CredentialsResponse> {
+) -> Result<Json<CredentialsResponse>, impl IntoResponse> {
     let url = params.get("url").cloned().unwrap_or_default();
     info!("Retrieving credentials for URL: {}", url);
     
@@ -472,19 +472,19 @@ async fn get_credentials_for_url(
     match bitwarden.get_credentials_for_url(&url).await {
         Ok(credentials) => {
             info!("Found {} credentials for URL: {}", credentials.len(), url);
-            Json(CredentialsResponse {
+            Ok(Json(CredentialsResponse {
                 success: true,
                 credentials: Some(credentials),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!("Failed to retrieve credentials for URL: {}", e);
-            Json(CredentialsResponse {
+            Ok(Json(CredentialsResponse {
                 success: false,
                 credentials: None,
                 error: Some(format!("Failed to retrieve credentials: {}", e)),
-            })
+            }))
         }
     }
 }
@@ -502,6 +502,21 @@ async fn create_session(
             Ok(Json(SessionResponse {
                 success: true,
                 session: Some(session),
+                error: None,
+            }))
+        }
+        Err(e) => {
+            error!("Failed to create session: {}", e);
+            Ok(Json(SessionResponse {
+                success: false,
+                session: None,
+                error: Some(format!("Failed to create session: {}", e)),
+            }))
+        }
+    }
+}
+
+// Endpoint do pobierania sesji
 async fn get_session(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
@@ -512,11 +527,11 @@ async fn get_session(
     match state.session_manager.get_session(&session_id).await {
         Ok(Some(session)) => {
             info!("Session found: {}", session_id);
-            Json(SessionResponse {
+            Ok(Json(SessionResponse {
                 success: true,
                 session: Some(session),
                 error: None,
-            })
+            }))
         }
         Ok(None) => {
             warn!("Session not found: {}", session_id);
@@ -528,11 +543,11 @@ async fn get_session(
         }
         Err(e) => {
             error!("Failed to retrieve session: {}", e);
-            Json(SessionResponse {
+            Ok(Json(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Failed to retrieve session: {}", e)),
-            })
+            }))
         }
     }
 }
