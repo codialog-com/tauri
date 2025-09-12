@@ -1,16 +1,20 @@
 #![cfg(test)]
 
-use super::*;
 use pretty_assertions::assert_eq;
 use crate::{
     llm::{
         generate_dsl_script,
         validate_dsl_script,
+        generate_fallback_script,
+        analyze_form_structure,
         process_natural_language_query,
         get_llm_response,
         LLMRequest,
         LLMResponse,
         LLMError,
+        FormAnalysis,
+        FormField,
+        FieldType,
         FormAnalyzerTrait,
     },
     database::setup_test_database,

@@ -18,13 +18,7 @@ use crate::{
     },
     database::setup_test_database,
 };
-use std::{
-    fs,
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
-use tokio::sync::Mutex;
+use std::path::PathBuf;
 use tempfile::tempdir;
 use chrono::Utc;
 use serde_json::json;
