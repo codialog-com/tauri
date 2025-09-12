@@ -2,15 +2,38 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
-use crate::session::SessionManager;
+use crate::{
+    session::{
+        SessionManager,
+        create_user_session,
+        get_user_session,
+        expire_user_session,
+        cleanup_expired_sessions,
+        validate_session,
+        update_user_session,
+        get_session_metrics,
+    },
+    database::setup_test_database,
+};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+use chrono::{Utc, Duration};
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    
+    // Helper function to create test user data
+    fn create_test_user_data() -> serde_json::Value {
+        serde_json::json!({
+            "user_id": Uuid::new_v4().to_string(),
+            "email": "test@example.com",
+            "name": "Test User",
+            "created_at": Utc::now().to_rfc3339(),
+        })
+    }
 
     #[tokio::test]
     async fn test_create_session() {
