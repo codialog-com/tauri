@@ -284,22 +284,22 @@ mod integration_tests {
             let session = session::create_user_session(&pool, &user_data).await.unwrap();
             
             // Manually expire session
-            sqlx::query!(
-                "UPDATE user_sessions SET expires_at = NOW() - INTERVAL '1 day' WHERE session_id = $1",
-                session.session_id
+            sqlx::query(
+                "UPDATE user_sessions SET expires_at = NOW() - INTERVAL '1 day' WHERE session_id = $1"
             )
+            .bind(&session.session_id)
             .execute(&pool)
             .await
             .expect("Should expire test session");
             
             // Create expired DSL cache entries
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO dsl_scripts_cache (cache_key, script_content, html_hash, created_at, expires_at)
-                 VALUES ($1, $2, $3, NOW(), NOW() - INTERVAL '1 day')",
-                format!("cleanup_test_{}", i),
-                "test script content",
-                "test_hash"
+                 VALUES ($1, $2, $3, NOW(), NOW() - INTERVAL '1 day')"
             )
+            .bind(format!("cleanup_test_{}", i))
+            .bind("test script content")
+            .bind("test_hash")
             .execute(&pool)
             .await
             .expect("Should insert expired cache entry");
@@ -309,7 +309,7 @@ mod integration_tests {
         }
         
         // Manually set old timestamps for logs
-        sqlx::query!(
+        sqlx::query(
             "UPDATE application_logs SET created_at = NOW() - INTERVAL '35 days' WHERE component = 'cleanup_test'"
         )
         .execute(&pool)
@@ -320,7 +320,7 @@ mod integration_tests {
         let session_cleanup = session::cleanup_expired_sessions(&pool).await;
         assert!(session_cleanup.is_ok(), "Should cleanup expired sessions");
         
-        let cache_cleanup = sqlx::query!("DELETE FROM dsl_scripts_cache WHERE expires_at < NOW()")
+        let cache_cleanup = sqlx::query("DELETE FROM dsl_scripts_cache WHERE expires_at < NOW()")
             .execute(&pool).await;
         assert!(cache_cleanup.is_ok(), "Should cleanup expired cache entries");
         
@@ -328,14 +328,14 @@ mod integration_tests {
         assert!(log_cleanup.is_ok(), "Should cleanup old logs");
         
         // Verify cleanup results
-        let remaining_sessions = sqlx::query!(
+        let remaining_sessions: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) as count FROM user_sessions WHERE expires_at < NOW()"
         )
         .fetch_one(&pool)
         .await
         .expect("Should query remaining sessions");
         
-        assert_eq!(remaining_sessions.count.unwrap_or(-1), 0, "Should have no expired sessions remaining");
+        assert_eq!(remaining_sessions.0, 0, "Should have no expired sessions remaining");
     }
 
     #[tokio::test]

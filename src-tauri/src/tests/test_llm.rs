@@ -1,12 +1,10 @@
 #![cfg(test)]
 
-use super::*;
-use pretty_assertions::assert_eq;
-use serde_json::json;
-
 mod tests {
-    use super::*;
+    use super::super::*;
     use crate::tagui::FormAnalyzerTrait;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
 
     // Mock FormAnalyzer for testing
     struct MockFormAnalyzer {
