@@ -3,16 +3,15 @@
 use super::{
     database::*,
     common::*,
-    pretty_assertions::assert_eq,
     serde_json::json,
 };
-use sqlx::{PgPool, Row, query as sqlx_query};
+use pretty_assertions::assert_eq;
+use sqlx::{PgPool, Row};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
-    use sqlx::{PgPool, Row};
+    use sqlx::query as sqlx_query;
 
     #[tokio::test]
     async fn test_database_connection() {

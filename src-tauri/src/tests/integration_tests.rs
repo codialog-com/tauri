@@ -7,15 +7,14 @@ use super::{
     session::*,
     database::*,
     common::*,
-    pretty_assertions::assert_eq,
     serde_json::json,
 };
+use pretty_assertions::assert_eq;
 use sqlx::query as sqlx_query;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
     use std::time::Duration;
 
     #[tokio::test]

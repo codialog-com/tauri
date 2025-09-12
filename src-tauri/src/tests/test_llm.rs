@@ -2,11 +2,12 @@
 
 use super::{
     llm::*,
-    tagui::FormAnalyzerTrait,
-    pretty_assertions::assert_eq,
+    common::*,
     serde_json::json,
 };
+use pretty_assertions::assert_eq;
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

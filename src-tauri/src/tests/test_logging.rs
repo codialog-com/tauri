@@ -3,9 +3,9 @@
 use super::{
     logging::*,
     common::*,
-    pretty_assertions::assert_eq,
     serde_json::json,
 };
+use pretty_assertions::assert_eq;
 use std::path::Path;
 use std::fs;
 use tracing::{info, warn, error, debug};
@@ -13,10 +13,6 @@ use tracing::{info, warn, error, debug};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
-    use std::path::Path;
-    use std::fs;
-    use tracing::{info, warn, error, debug};
 
     #[tokio::test]
     async fn test_log_file_creation() {
