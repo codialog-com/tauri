@@ -492,7 +492,7 @@ async fn get_credentials_for_url(
 async fn create_session(
     Json(payload): Json<SessionRequest>,
     State(state): State<AppState>,
-) -> Json<SessionResponse> {
+) -> ResponseJson<SessionResponse> {
     info!("Creating session for user: {}", payload.user_id);
     
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
