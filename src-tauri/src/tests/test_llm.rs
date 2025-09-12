@@ -1,9 +1,54 @@
-#[cfg(test)]
-mod tests {
-    use super::super::llm::*;
-    use super::common::*;
-    use serde_json::json;
-    use tokio_test;
+use super::*;
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use tokio::test;
+
+// Mock FormAnalyzer for testing
+struct MockFormAnalyzer {
+    is_login: bool,
+    has_file_input: bool,
+}
+
+impl MockFormAnalyzer {
+    fn new() -> Self {
+        Self {
+            is_login: true,
+            has_file_input: false,
+        }
+    }
+    
+    fn with_login(mut self, is_login: bool) -> Self {
+        self.is_login = is_login;
+        self
+    }
+    
+    fn with_file_input(mut self, has_file: bool) -> Self {
+        self.has_file_input = has_file;
+        self
+    }
+}
+
+impl FormAnalyzerTrait for MockFormAnalyzer {
+    fn is_login_form(&self) -> bool {
+        self.is_login
+    }
+    
+    fn has_file_input(&self) -> bool {
+        self.has_file_input
+    }
+    
+    fn get_elements_by_type(&self, _: &str) -> Vec<String> {
+        vec![]
+    }
+    
+    fn find_submit_button(&self) -> Option<String> {
+        Some("#submit".to_string())
+    }
+    
+    fn find_cookie_consent(&self) -> Option<String> {
+        None
+    }
+}
 
     #[tokio::test]
     async fn test_generate_dsl_script_basic() {
