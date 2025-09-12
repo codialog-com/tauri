@@ -3,9 +3,8 @@
 use super::{
     llm::*,
     common::*,
-    serde_json::json,
 };
-// Import assert_eq using fully qualified path
+use serde_json::json;
 
 #[cfg(test)]
 mod tests {

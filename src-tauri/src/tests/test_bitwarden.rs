@@ -4,6 +4,7 @@ use super::{
     bitwarden::*,
     common::*,
 };
+use serde_json::json;
 
 #[cfg(test)]
 mod tests {
