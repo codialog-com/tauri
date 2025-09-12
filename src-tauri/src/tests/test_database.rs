@@ -1,7 +1,12 @@
 #![cfg(test)]
 
-use super::common::*;
-use pretty_assertions::assert_eq;
+use super::{
+    database::*,
+    common::*,
+    pretty_assertions::assert_eq,
+    serde_json::json,
+};
+use sqlx::{PgPool, Row, query as sqlx_query};
 
 mod tests {
     use super::*;

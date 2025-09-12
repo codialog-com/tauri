@@ -1,8 +1,12 @@
 #![cfg(test)]
 
-use super::common::*;
-use pretty_assertions::assert_eq;
-use serde_json::json;
+use super::{
+    session::*,
+    common::*,
+    pretty_assertions::assert_eq,
+    serde_json::json,
+};
+use uuid::Uuid;
 
 mod tests {
     use super::*;
