@@ -1,26 +1,14 @@
 #![cfg(test)]
 
-use super::*;
-use pretty_assertions::assert_eq;
 use crate::{
     bitwarden::{
-        BitwardenManager,
-        BitwardenCredential,
-        BitwardenLogin,
-        BitwardenUri,
         check_bitwarden_status,
         parse_bitwarden_credentials,
         bitwarden_login,
     },
     database::setup_test_database,
 };
-use serde_json::json;
-use std::{
-    process::Command,
-    sync::Arc,
-    time::Duration,
-};
-use tokio::sync::Mutex;
+use pretty_assertions::assert_eq;
 use uuid::Uuid;
 use chrono::Utc;
 
