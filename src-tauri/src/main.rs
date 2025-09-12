@@ -17,7 +17,7 @@ use axum::{
     routing::{get, post},
     Router,
     extract::{Json, State, Query},
-    response::{Json as ResponseJson, IntoResponse},
+    response::IntoResponse,
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
@@ -361,53 +361,32 @@ async fn clear_logs(
 
 // Endpoint do logowania się do Bitwarden
 async fn bitwarden_login(
-    Json(payload): Json<BitwardenLoginRequest>,
     State(state): State<AppState>,
-) -> Json<SessionResponse> {
+    Json(payload): Json<BitwardenLoginRequest>,
+) -> Result<Json<SessionResponse>, impl IntoResponse> {
     info!("Bitwarden login attempt for user: {}", payload.email);
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
     
     match bitwarden.login(&payload.email, &payload.master_password).await {
-        Ok(()) => {
-            info!("Bitwarden login successful for: {}", payload.email);
-            
-            // Utwórz sesję użytkownika
-            let user_data = UserData::default();
-            match state.session_manager.create_session(&payload.email, user_data).await {
-                Ok(session) => {
-                    Json(SessionResponse {
-                        success: true,
-                        session: Some(session),
-                        error: None,
-                    })
-                }
-                Err(e) => {
-                    error!("Failed to create session: {}", e);
-                    Json(SessionResponse {
-                        success: false,
-                        session: None,
-                        error: Some(format!("Failed to create session: {}", e)),
-                    })
-                }
             }
         }
         Err(e) => {
             error!("Bitwarden login failed: {}", e);
-            Json(SessionResponse {
+            Ok(Json(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Bitwarden login failed: {}", e)),
-            })
+            }))
         }
     }
 }
 
 // Endpoint do odblokowywania Bitwarden vault
 async fn bitwarden_unlock(
-    Json(payload): Json<BitwardenUnlockRequest>,
     State(state): State<AppState>,
-) -> Json<serde_json::Value> {
+    Json(payload): Json<BitwardenUnlockRequest>,
+) -> Result<Json<serde_json::Value>, impl IntoResponse> {
     info!("Bitwarden vault unlock attempt");
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
@@ -415,17 +394,17 @@ async fn bitwarden_unlock(
     match bitwarden.unlock(&payload.master_password).await {
         Ok(()) => {
             info!("Bitwarden vault unlocked successfully");
-            Json(serde_json::json!({
+            Ok(Json(serde_json::json!({
                 "success": true,
                 "message": "Vault unlocked successfully"
-            }))
+            })))
         }
         Err(e) => {
             error!("Failed to unlock Bitwarden vault: {}", e);
-            Json(serde_json::json!({
+            Ok(Json(serde_json::json!({
                 "success": false,
                 "error": format!("Failed to unlock vault: {}", e)
-            }))
+            })))
         }
     }
 }
@@ -490,15 +469,15 @@ async fn get_credentials_for_url(
 
 // Endpoint do tworzenia/aktualizacji sesji użytkownika
 async fn create_session(
-    Json(payload): Json<SessionRequest>,
     State(state): State<AppState>,
-) -> impl IntoResponse {
+    Json(payload): Json<SessionRequest>,
+) -> Result<Json<SessionResponse>, impl IntoResponse> {
     info!("Creating session for user: {}", payload.user_id);
     
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
         Ok(session) => {
             info!("Session created successfully: {}", session.session_id);
-            ResponseJson(SessionResponse {
+            Json(SessionResponse {
                 success: true,
                 session: Some(session),
                 error: None,
@@ -506,7 +485,7 @@ async fn create_session(
         }
         Err(e) => {
             error!("Failed to create session: {}", e);
-            ResponseJson(SessionResponse {
+            Json(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Failed to create session: {}", e)),
