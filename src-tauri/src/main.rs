@@ -407,7 +407,7 @@ async fn bitwarden_login(
 async fn bitwarden_unlock(
     Json(payload): Json<BitwardenUnlockRequest>,
     State(state): State<AppState>,
-) -> Json<serde_json::Value> {
+) -> ResponseJson<serde_json::Value> {
     info!("Bitwarden vault unlock attempt");
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
@@ -415,14 +415,14 @@ async fn bitwarden_unlock(
     match bitwarden.unlock(&payload.master_password).await {
         Ok(()) => {
             info!("Bitwarden vault unlocked successfully");
-            Json(serde_json::json!({
+            ResponseJson(serde_json::json!({
                 "success": true,
                 "message": "Vault unlocked successfully"
             }))
         }
         Err(e) => {
             error!("Failed to unlock Bitwarden vault: {}", e);
-            Json(serde_json::json!({
+            ResponseJson(serde_json::json!({
                 "success": false,
                 "error": format!("Failed to unlock vault: {}", e)
             }))
