@@ -1,15 +1,20 @@
 #![cfg(test)]
 
-use super::*;
-use pretty_assertions::assert_eq;
 use crate::database::{
     setup_test_database,
     get_db_pool,
     run_migrations,
     execute_sql,
 };
-use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
+use pretty_assertions::assert_eq;
+use sqlx::{
+    postgres::PgPoolOptions,
+    PgPool,
+    Row,
+    postgres::PgRow,
+    types::chrono::{DateTime, Utc},
+};
+use uuid::Uuid;
 
 // Helper function to create a test database connection
 async fn setup_test_database() -> PgPool {
