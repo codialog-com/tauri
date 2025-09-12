@@ -2,12 +2,41 @@
 
 use super::*;
 use pretty_assertions::assert_eq;
-use crate::bitwarden::BitwardenCredential;
+use crate::{
+    bitwarden::{
+        BitwardenManager,
+        BitwardenCredential,
+        BitwardenLogin,
+        BitwardenUri,
+    },
+    database::setup_test_database,
+};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use uuid::Uuid;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    // Helper function to create a test Bitwarden credential
+    fn create_test_credential() -> BitwardenCredential {
+        BitwardenCredential {
+            id: Uuid::new_v4().to_string(),
+            name: "Test Credential".to_string(),
+            login: Some(BitwardenLogin {
+                username: Some("testuser@example.com".to_string()),
+                password: Some("testpassword".to_string()),
+                uris: Some(vec![BitwardenUri {
+                    uri: Some("https://example.com".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_bitwarden_credential_creation() {

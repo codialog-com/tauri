@@ -1,10 +1,32 @@
 #![cfg(test)]
 
-use super::{
-    logging::*,
-    common::*,
+use super::*;
+use pretty_assertions::assert_eq;
+use crate::{
+    logging::{
+        LogManager,
+        initialize_logging_system,
+        log_user_action,
+        get_application_logs,
+        get_logs_by_level,
+        get_log_statistics,
+        write_log_to_file,
+        rotate_log_file,
+        log_performance_metric,
+        get_performance_logs,
+        cleanup_old_logs,
+    },
+    database::setup_test_database,
 };
-use std::path::Path;
+use std::{
+    fs,
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
+use tokio::sync::Mutex;
+use tempfile::tempdir;
+use chrono::Utc;
 
 #[cfg(test)]
 mod tests {
