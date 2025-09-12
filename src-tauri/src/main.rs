@@ -377,7 +377,7 @@ async fn bitwarden_login(
             match state.session_manager.create_session(&payload.email, user_data).await {
                 Ok(session) => {
                     info!("Session created successfully: {}", session.session_id);
-                    Ok(Json(SessionResponse {
+                    Ok::<_, axum::response::Response>(Json(SessionResponse {
                         success: true,
                         session: Some(session),
                         error: None,
@@ -385,7 +385,7 @@ async fn bitwarden_login(
                 }
                 Err(e) => {
                     error!("Failed to create session: {}", e);
-                    Ok(Json(SessionResponse {
+                    Ok::<_, axum::response::Response>(Json(SessionResponse {
                         success: false,
                         session: None,
                         error: Some(format!("Failed to create session: {}", e)),
@@ -395,7 +395,7 @@ async fn bitwarden_login(
         }
         Err(e) => {
             error!("Bitwarden login failed: {}", e);
-            Ok(Json(SessionResponse {
+            Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: false,
                 session: None,
                 error: Some(format!("Bitwarden login failed: {}", e)),
@@ -413,19 +413,19 @@ async fn bitwarden_unlock(
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
     
-    match bitwarden.unlock(&payload.master_password).await {
+    match bitwarden.unlock(&payload.password).await {
         Ok(()) => {
             info!("Bitwarden vault unlocked successfully");
-            Ok(Json(serde_json::json!({
+            Ok::<_, axum::response::Response>(Json(json!({
                 "success": true,
-                "message": "Vault unlocked successfully"
+                "error": null
             })))
         }
         Err(e) => {
             error!("Failed to unlock Bitwarden vault: {}", e);
-            Ok(Json(serde_json::json!({
+            Ok::<_, axum::response::Response>(Json(json!({
                 "success": false,
-                "error": format!("Failed to unlock vault: {}", e)
+                "error": format!("Failed to unlock Bitwarden vault: {}", e)
             })))
         }
     }
@@ -442,7 +442,7 @@ async fn get_credentials(
     match bitwarden.get_all_credentials().await {
         Ok(credentials) => {
             info!("Retrieved {} credentials", credentials.len());
-            Ok(Json(CredentialsResponse {
+            Ok::<_, axum::response::Response>(Json(CredentialsResponse {
                 success: true,
                 credentials: Some(credentials),
                 error: None,
@@ -450,7 +450,7 @@ async fn get_credentials(
         }
         Err(e) => {
             error!("Failed to retrieve credentials: {}", e);
-            Ok(Json(CredentialsResponse {
+            Ok::<_, axum::response::Response>(Json(CredentialsResponse {
                 success: false,
                 credentials: None,
                 error: Some(format!("Failed to retrieve credentials: {}", e)),
@@ -480,9 +480,9 @@ async fn get_credentials_for_url(
     let bitwarden = state.bitwarden_manager.lock().await;
     
     match bitwarden.get_credentials_for_url(&url).await {
-        Ok(credentials) => {
+        Ok(credentials: Vec<Credential>) => {
             info!("Found {} credentials for URL: {}", credentials.len(), url);
-            Ok(Json(CredentialsResponse {
+            Ok::<_, axum::response::Response>(Json(CredentialsResponse {
                 success: true,
                 credentials: Some(credentials),
                 error: None,
@@ -490,7 +490,7 @@ async fn get_credentials_for_url(
         }
         Err(e) => {
             error!("Failed to retrieve credentials for URL {}: {}", url, e);
-            Ok(Json(CredentialsResponse {
+            Ok::<_, axum::response::Response>(Json(CredentialsResponse {
                 success: false,
                 credentials: None,
                 error: Some(format!("Failed to retrieve credentials: {}", e)),
@@ -515,26 +515,24 @@ async fn create_session(
     info!("Creating session for user: {}", payload.user_id);
     
     match state.session_manager.create_session(&payload.user_id, payload.user_data).await {
-        Ok(session) => {
-            info!("Session created successfully: {}", session.session_id);
-            Ok(Json(SessionResponse {
+        Ok(session: Session) => {
+            info!("Session created/updated successfully: {}", session.session_id);
+            Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: true,
                 session: Some(session),
                 error: None,
             }))
         }
         Err(e) => {
-            error!("Failed to create session: {}", e);
-            Ok(Json(SessionResponse {
+            error!("Failed to create/update session: {}", e);
+            Ok::<_, axum::response::Response>(Json(SessionResponse {
                 success: false,
                 session: None,
-                error: Some(format!("Failed to create session: {}", e)),
+                error: Some(format!("Failed to create/update session: {}", e)),
             }))
         }
     }
 }
-
-// Endpoint do pobierania sesji
 async fn get_session(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
