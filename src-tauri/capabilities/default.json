@@ -1,0 +1,36 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "windows": [
+    {
+      "label": "main",
+      "title": "Codialog - Automatyzacja CV",
+      "width": 900,
+      "height": 800,
+      "resizable": true,
+      "fullscreen": false
+    }
+  ],
+  "permissions": [
+    {
+      "identifier": "default",
+      "description": "Default permissions for the application",
+      "allow": [
+        {
+          "windows": ["main"],
+          "plugins": [
+            {
+              "name": "shell",
+              "allow": [
+                {
+                  "enable": true,
+                  "open": true,
+                  "execute": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
