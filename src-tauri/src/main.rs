@@ -407,7 +407,7 @@ async fn bitwarden_login(
 async fn bitwarden_unlock(
     Json(payload): Json<BitwardenUnlockRequest>,
     State(state): State<AppState>,
-) -> ResponseJson<serde_json::Value> {
+) -> Result<ResponseJson<serde_json::Value>, StatusCode> {
     info!("Bitwarden vault unlock attempt");
     
     let mut bitwarden = state.bitwarden_manager.lock().await;
