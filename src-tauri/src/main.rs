@@ -434,7 +434,7 @@ async fn bitwarden_unlock(
 // Endpoint do pobierania wszystkich danych logowania
 async fn get_credentials(
     State(state): State<AppState>,
-) -> Json<CredentialsResponse> {
+) -> Result<Json<CredentialsResponse>, impl IntoResponse> {
     info!("Retrieving all credentials from Bitwarden");
     
     let bitwarden = state.bitwarden_manager.lock().await;
@@ -442,19 +442,19 @@ async fn get_credentials(
     match bitwarden.get_all_credentials().await {
         Ok(credentials) => {
             info!("Retrieved {} credentials", credentials.len());
-            Json(CredentialsResponse {
+            Ok(Json(CredentialsResponse {
                 success: true,
                 credentials: Some(credentials),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!("Failed to retrieve credentials: {}", e);
-            Json(CredentialsResponse {
+            Ok(Json(CredentialsResponse {
                 success: false,
                 credentials: None,
                 error: Some(format!("Failed to retrieve credentials: {}", e)),
-            })
+            }))
         }
     }
 }
