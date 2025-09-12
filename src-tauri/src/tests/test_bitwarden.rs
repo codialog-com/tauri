@@ -3,13 +3,13 @@
 use super::{
     bitwarden::*,
     common::*,
-    serde_json::json,
 };
-use pretty_assertions::assert_eq;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq as pretty_assert_eq;
+    // Import assert_eq using fully qualified path
 
     #[test]
     fn test_bitwarden_credential_creation() {

@@ -3,14 +3,14 @@
 use super::{
     session::*,
     common::*,
-    serde_json::json,
 };
-use pretty_assertions::assert_eq;
-use uuid::Uuid;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq as pretty_assert_eq;
+    // Import assert_eq using fully qualified path
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_create_session() {

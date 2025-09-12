@@ -5,11 +5,12 @@ use super::{
     common::*,
     serde_json::json,
 };
-use pretty_assertions::assert_eq;
+// Import assert_eq using fully qualified path
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq as pretty_assert_eq;
 
     // Mock FormAnalyzer for testing
     struct MockFormAnalyzer {
