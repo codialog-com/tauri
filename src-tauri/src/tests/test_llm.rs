@@ -10,7 +10,7 @@ use super::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq as pretty_assert_eq;
+    // Using fully qualified path for assert_eq to avoid ambiguity
 
     // Mock FormAnalyzer for testing
     struct MockFormAnalyzer {

@@ -8,8 +8,7 @@ use super::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq as pretty_assert_eq;
-    // Import assert_eq using fully qualified path
+    // Using fully qualified path for assert_eq to avoid ambiguity
     use uuid::Uuid;
 
     #[tokio::test]

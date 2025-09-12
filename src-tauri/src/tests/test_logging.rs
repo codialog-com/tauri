@@ -9,8 +9,7 @@ use std::path::Path;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq as pretty_assert_eq;
-    // Import assert_eq using fully qualified path
+    // Using fully qualified path for assert_eq to avoid ambiguity
     use std::fs;
     use tracing::{info, warn, error, debug};
 

@@ -8,15 +8,14 @@ use super::{
     database::*,
     common::*,
 };
-use pretty_assertions::assert_eq;
+// Import assert_eq using fully qualified path
 use sqlx::query as sqlx_query;
 use std::time::Duration;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq as pretty_assert_eq;
-    use pretty_assertions::assert_eq;
+    // Using fully qualified path for assert_eq to avoid ambiguity
     use sqlx::query as sqlx_query;
     use std::time::Duration;
 
