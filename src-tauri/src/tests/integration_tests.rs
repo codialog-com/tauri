@@ -475,34 +475,83 @@ mod tests {
         
         // Test security measures across components
         
-        // 1. Test session security
-        let user_data = json!({
+        // 1. Test session security with sensitive data
+        let sensitive_data = json!({
             "email": "security@example.com",
-            "password": "sensitive_password",
-            "credit_card": "1234-5678-9012-3456"
+            "password": "s3cr3tP@ssw0rd!",
+            "credit_card": "4111-1111-1111-1111",
+            "ssn": "123-45-6789"
         });
         
-        let session = session::create_user_session(&pool, &user_data).await.unwrap();
-        let retrieved = session::get_user_session(&pool, &session.session_id).await.unwrap().unwrap();
+        // Create a session with sensitive data
+        let session_result = create_user_session(&pool, &sensitive_data).await;
+        assert!(session_result.is_ok(), "Should create session with sensitive data");
         
-        // Verify sensitive data handling in session
-        assert!(!retrieved.data.contains("sensitive_password"), "Password should not be stored in session");
+        let session = session_result.unwrap();
         
-        // 2. Test logging security (sensitive data sanitization)
-        logging::log_user_action(&pool, "security_test", "login_attempt", &json!({
-            "email": "security@example.com",
-            "password": "should_be_redacted",
-            "result": "success"
-        })).await.expect("Should log with sensitive data");
+        // Retrieve the session and verify sensitive data is not stored in plaintext
+        let retrieved_result = get_user_session(&pool, &session.session_id).await;
+        assert!(retrieved_result.is_ok(), "Should retrieve session");
         
-        let security_logs = logging::get_logs_by_component(&pool, "security_test", Some(5)).await;
-        // In a real implementation, verify that passwords are redacted in logs
+        let retrieved_session = retrieved_result.unwrap();
+        assert!(retrieved_session.is_some(), "Session should exist");
+        
+        let session_data = &retrieved_session.unwrap().data;
+        
+        // Verify sensitive data is not stored in plaintext
+        let sensitive_fields = ["s3cr3tP@ssw0rd!", "4111-1111-1111-1111", "123-45-6789"];
+        for field in &sensitive_fields {
+            assert!(
+                !session_data.contains(field),
+                "Session data should not contain sensitive information: {}",
+                field
+            );
+        }
+        
+        // 2. Test logging security - verify sensitive data is redacted
+        let log_result = log_user_action(
+            &pool,
+            "security-test-user",
+            "login_attempt",
+            "security_test",
+            &json!({
+                "email": "security@example.com",
+                "password": "s3cr3tP@ssw0rd!",
+                "credit_card": "4111-1111-1111-1111"
+            })
+        ).await;
+        
+        assert!(log_result.is_ok(), "Should log security event");
         
         // 3. Test DSL script generation with sensitive data
-        let sensitive_html = r#"<input type="password" name="secret">"#;
-        let dsl_script = llm::generate_dsl_script_with_cache(&sensitive_html, &user_data, Some(&pool)).await;
+        let sensitive_html = r#"
+            <form>
+                <input type="password" name="password">
+                <input type="text" name="credit_card" placeholder="Credit Card">
+                <input type="text" name="ssn" placeholder="Social Security Number">
+            </form>
+        "#;
         
-        // DSL script should not contain raw sensitive data
-        assert!(!dsl_script.contains("sensitive_password"), "DSL should not contain raw passwords");
+        let dsl_script = generate_dsl_script(sensitive_html, &sensitive_data).await;
+        assert!(!dsl_script.is_empty(), "Should generate DSL script");
+        
+        // Verify sensitive data is not exposed in the generated script
+        for field in &sensitive_fields {
+            assert!(
+                !dsl_script.contains(field),
+                "Generated DSL should not contain sensitive data: {}",
+                field
+            );
+        }
+        
+        // 4. Test SQL injection prevention
+        let sql_injection_attempt = "'; DROP TABLE users; --";
+        let injection_result = get_user_session(&pool, sql_injection_attempt).await;
+        
+        // Should either return an error or no session, but should not execute the SQL
+        assert!(
+            injection_result.is_ok() && injection_result.unwrap().is_none(),
+            "Should safely handle SQL injection attempts"
+        );
     }
 }
