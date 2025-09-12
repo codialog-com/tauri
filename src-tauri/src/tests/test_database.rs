@@ -8,7 +8,8 @@ use crate::database::{
     run_migrations,
     execute_sql,
 };
-use uuid::Uuid;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 
 // Helper function to create a test database connection
 async fn setup_test_database() -> PgPool {
