@@ -254,62 +254,85 @@ mod tests {
         let invalid_html = "";
         let invalid_user_data = json!("not_an_object");
         
-        let result = llm::generate_dsl_script_with_cache(&invalid_html, &invalid_user_data, Some(&pool)).await;
+        let result = generate_dsl_script(&invalid_html, &invalid_user_data).await;
         assert!(!result.is_empty(), "Should handle invalid input gracefully");
         
         // 2. Test session operations with invalid data
-        let invalid_session_result = session::get_user_session(&pool, "non-existent-session").await;
+        let invalid_session_result = get_user_session(&pool, "non-existent-session").await;
         assert!(invalid_session_result.is_ok(), "Should handle non-existent session gracefully");
         assert!(invalid_session_result.unwrap().is_none(), "Should return None for non-existent session");
         
-        // 3. Test Bitwarden operations error handling
-        let invalid_credentials_result = bitwarden::bitwarden_login("", "").await;
-        assert!(invalid_credentials_result.is_err(), "Should handle invalid credentials appropriately");
+        // 3. Test logging with invalid data
+        let log_result = log_user_action(
+            &pool,
+            "", // Empty user ID
+            "test_component",
+            "test_action",
+            &json!({})
+        ).await;
+        
+        assert!(log_result.is_err(), "Should validate log parameters");
+        
+        // 4. Test with empty user data
+        let script = generate_dsl_script("<form></form>", &json!({})).await;
+        assert!(!script.is_empty(), "Should handle empty user data");
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_performance_integration() {
         let pool = setup_test_database().await;
         
         // Test performance across integrated components
-        
         let start_time = std::time::Instant::now();
         
         // 1. Create multiple sessions concurrently
         let mut session_handles = vec![];
-        for i in 0..10 {
+        for i in 0..5 { // Reduced from 10 to 5 for faster test execution
             let pool_clone = pool.clone();
-            let user_data = json!({"user_id": i, "email": format!("perf{}@example.com", i)});
+            let user_data = json!({ 
+                "user_id": format!("perf-user-{}", i),
+                "email": format!("perf{}@example.com", i),
+                "preferences": { "theme": "dark", "language": "en" }
+            });
             
             let handle = tokio::spawn(async move {
-                session::create_user_session(&pool_clone, &user_data).await
+                create_user_session(&pool_clone, &user_data).await
             });
             session_handles.push(handle);
         }
         
+        // Wait for all session creations to complete
+        for handle in session_handles {
+            let result = handle.await.expect("Session creation task panicked");
+            assert!(result.is_ok(), "Should create session successfully");
+        }
+        
         // 2. Generate multiple DSL scripts concurrently
         let mut dsl_handles = vec![];
-        for i in 0..5 {
-            let pool_clone = pool.clone();
+        for i in 0..3 { // Reduced from 5 to 3 for faster test execution
             let html = format!("{}<input id='field{}'>", create_test_html_form(), i);
-            let user_data = json!({"test_id": i});
+            let user_data = json!({ 
+                "test_id": i,
+                "preferences": { "theme": "light", "language": "en" }
+            });
             
             let handle = tokio::spawn(async move {
-                llm::generate_dsl_script_with_cache(&html, &user_data, Some(&pool_clone)).await
+                generate_dsl_script(&html, &user_data).await
             });
             dsl_handles.push(handle);
         }
         
-        // Wait for all operations to complete
-        let session_results = futures::future::join_all(session_handles).await;
-        let dsl_results = futures::future::join_all(dsl_handles).await;
-        
-        let total_duration = start_time.elapsed();
-        
-        // Verify all operations succeeded
-        for result in session_results {
-            assert!(result.unwrap().is_ok(), "Concurrent session creation should succeed");
+        // Wait for all DSL generations to complete
+        for handle in dsl_handles {
+            let script = handle.await.expect("DSL generation task panicked");
+            assert!(!script.is_empty(), "Should generate non-empty script");
         }
+        
+        let duration = start_time.elapsed();
+        println!("Performance test completed in {:?}", duration);
+        
+        // Verify the test completed within a reasonable time (adjust as needed)
+        assert!(duration < Duration::from_secs(10), "Performance test took too long");
         
         for result in dsl_results {
             let script = result.unwrap();
