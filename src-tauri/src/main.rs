@@ -46,7 +46,6 @@ struct AppState {
     bitwarden_manager: Arc<Mutex<BitwardenManager>>,
     session_manager: Arc<SessionManager>,
     db_pool: PgPool,
-    redis_client: Client,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -630,8 +629,8 @@ fn main() {
     // Stwórz Tokio runtime
     let rt = tokio::runtime::Runtime::new().unwrap();
     
-    // Initialize database and Redis connections
-    let (db_pool, bitwarden_manager, session_manager, redis_client) = rt.block_on(async {
+    // Initialize database
+    let (db_pool, bitwarden_manager, session_manager) = rt.block_on(async {
         // Initialize database
         let db_pool = initialize_database().await
             .expect("Failed to initialize database");
@@ -654,11 +653,7 @@ fn main() {
             std::process::exit(1);
         }
         
-        // Initialize Redis client
-        let redis_client = redis::Client::open("redis://localhost:6379")
-            .expect("Failed to connect to Redis");
-        
-        (db_pool, bitwarden_manager, session_manager, redis_client)
+        (db_pool, bitwarden_manager, session_manager)
     });
     
     let app_state = AppState {
@@ -667,7 +662,6 @@ fn main() {
         bitwarden_manager: Arc::new(Mutex::new(bitwarden_manager)),
         session_manager: Arc::new(session_manager),
         db_pool,
-        redis_client,
     };
 
     // Uruchom serwer HTTP w tle

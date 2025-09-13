@@ -50,14 +50,21 @@ impl Default for UserData {
 #[derive(Debug, Clone)]
 pub struct SessionManager {
     db_pool: PgPool,
-    redis_client: redis::Client,
+    redis_client: Option<redis::Client>,
 }
 
 impl SessionManager {
-    pub fn new(db_pool: PgPool, redis_client: redis::Client) -> Self {
+    pub fn new(db_pool: PgPool) -> Self {
         Self {
             db_pool,
-            redis_client,
+            redis_client: None,
+        }
+    }
+
+    pub fn with_redis(db_pool: PgPool, redis_client: redis::Client) -> Self {
+        Self {
+            db_pool,
+            redis_client: Some(redis_client),
         }
     }
 
@@ -174,14 +181,16 @@ impl SessionManager {
         .context("Failed to create session in database")?;
 
         // Cache w Redis dla szybkiego dostępu
-        let mut redis_conn = self.redis_client.get_async_connection().await?;
-        let session_json = serde_json::to_string(&session)?;
-        let _: () = redis::cmd("SETEX")
-            .arg(&format!("session:{}", session_id))
-            .arg(86400)
-            .arg(session_json)
-            .query_async::<_, ()>(&mut redis_conn)
-            .await?;
+        if let Some(redis_client) = &self.redis_client {
+            let mut redis_conn = redis_client.get_async_connection().await?;
+            let session_json = serde_json::to_string(&session)?;
+            let _: () = redis::cmd("SETEX")
+                .arg(&format!("session:{}", session_id))
+                .arg(86400)
+                .arg(session_json)
+                .query_async::<_, ()>(&mut redis_conn)
+                .await?;
+        }
 
         info!("Session created successfully: {}", session_id);
         Ok(session)
@@ -192,16 +201,18 @@ impl SessionManager {
         debug!("Retrieving session: {}", session_id);
 
         // Najpierw sprawdź Redis cache
-        let mut redis_conn = self.redis_client.get_async_connection().await?;
-        
-        if let Ok(cached_session) = redis_conn
-            .get::<&str, String>(&format!("session:{}", session_id))
-            .await
-        {
-            if let Ok(session) = serde_json::from_str::<UserSession>(&cached_session) {
-                if session.expires_at > Utc::now() {
-                    debug!("Session found in Redis cache: {}", session_id);
-                    return Ok(Some(session));
+        if let Some(redis_client) = &self.redis_client {
+            let mut redis_conn = redis_client.get_async_connection().await?;
+            
+            if let Ok(cached_session) = redis_conn
+                .get::<&str, String>(&format!("session:{}", session_id))
+                .await
+            {
+                if let Ok(session) = serde_json::from_str::<UserSession>(&cached_session) {
+                    if session.expires_at > Utc::now() {
+                        debug!("Session found in Redis cache: {}", session_id);
+                        return Ok(Some(session));
+                    }
                 }
             }
         }
@@ -234,13 +245,16 @@ impl SessionManager {
             };
 
             // Odśwież cache w Redis
-            let session_json = serde_json::to_string(&session)?;
-            let _: () = redis::cmd("SETEX")
-                .arg(&format!("session:{}", session_id))
-                .arg(86400)
-                .arg(session_json)
-                .query_async::<_, ()>(&mut redis_conn)
-                .await?;
+            if let Some(redis_client) = &self.redis_client {
+                let mut redis_conn = redis_client.get_async_connection().await?;
+                let session_json = serde_json::to_string(&session)?;
+                let _: () = redis::cmd("SETEX")
+                    .arg(&format!("session:{}", session_id))
+                    .arg(86400)
+                    .arg(session_json)
+                    .query_async::<_, ()>(&mut redis_conn)
+                    .await?;
+            }
 
             debug!("Session found in database and cached: {}", session_id);
             Ok(Some(session))
@@ -270,14 +284,16 @@ impl SessionManager {
         .context("Failed to update session in database")?;
 
         // Aktualizuj cache w Redis
-        let mut redis_conn = self.redis_client.get_async_connection().await?;
-        let session_json = serde_json::to_string(session)?;
-        let _: () = redis::cmd("SETEX")
-            .arg(&format!("session:{}", session.session_id))
-            .arg(86400)
-            .arg(session_json)
-            .query_async::<_, ()>(&mut redis_conn)
-            .await?;
+        if let Some(redis_client) = &self.redis_client {
+            let mut redis_conn = redis_client.get_async_connection().await?;
+            let session_json = serde_json::to_string(session)?;
+            let _: () = redis::cmd("SETEX")
+                .arg(&format!("session:{}", session.session_id))
+                .arg(86400)
+                .arg(session_json)
+                .query_async::<_, ()>(&mut redis_conn)
+                .await?;
+        }
 
         debug!("Session updated successfully: {}", session.session_id);
         Ok(())
