@@ -121,20 +121,20 @@ start_redis() {
     print_status "Redis jest gotowy"
 }
 
-# Start Bitwarden CLI service
-start_bitwarden_cli() {
-    print_header "Uruchamianie usługi Bitwarden CLI..."
-    
-    docker-compose -f docker-compose.bitwarden.yml up -d bitwarden-cli
-    
-    print_status "Usługa Bitwarden CLI uruchomiona"
-}
+# Start Bitwarden CLI service - Temporarily removed due to image pull issues
+# start_bitwarden_cli() {
+#     print_header "Uruchamianie usługi Bitwarden CLI..."
+#     
+#     docker-compose -f docker-compose.bitwarden.yml up -d bitwarden-cli
+#     
+#     print_status "Usługa Bitwarden CLI uruchomiona"
+# }
 
 # Health check all services
 health_check() {
     print_header "Sprawdzanie stanu usług..."
     
-    services=("postgres" "redis" "bitwarden" "bitwarden-cli")
+    services=("postgres" "redis" "bitwarden")
     
     for service in "${services[@]}"; do
         if docker-compose -f docker-compose.bitwarden.yml ps | grep -q "$service.*Up"; then
@@ -182,7 +182,8 @@ main() {
     init_database
     start_redis
     start_bitwarden
-    start_bitwarden_cli
+    # Temporarily removed due to image pull issues
+    # start_bitwarden_cli
     
     sleep 5  # Allow services to fully start
     

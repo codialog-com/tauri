@@ -52,23 +52,23 @@ services:
     networks:
       - codialog_network
 
-  # Bitwarden CLI helper service
-  bitwarden-cli:
-    image: bitwarden/cli:2023.1.0
-    container_name: codialog_bw_cli
-    restart: unless-stopped
-    environment:
-      - BW_SERVE=true
-      - BW_SERVER=http://bitwarden
-    volumes:
-      - bw_cli_data:/home/node/.config/Bitwarden CLI
-    networks:
-      - codialog_network
-    depends_on:
-      - bitwarden
-    command: ['sh', '-c', 'bw serve --hostname 0.0.0.0 --port 8087']
-    ports:
-      - "8087:8087"
+  # Bitwarden CLI helper service - Temporarily removed due to image pull issues
+  # bitwarden-cli:
+  #   image: bitwarden/cli:2023.1.0
+  #   container_name: codialog_bw_cli
+  #   restart: unless-stopped
+  #   environment:
+  #     - BW_SERVE=true
+  #     - BW_SERVER=http://bitwarden
+  #   volumes:
+  #     - bw_cli_data:/home/node/.config/Bitwarden CLI
+  #   networks:
+  #     - codialog_network
+  #   depends_on:
+  #     - bitwarden
+  #   command: ['sh', '-c', 'bw serve --hostname 0.0.0.0 --port 8087']
+  #   ports:
+  #     - "8087:8087"
 
   # Codialog main application
   codialog:
