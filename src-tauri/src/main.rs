@@ -35,7 +35,6 @@ use logging::LogManager;
 use bitwarden::{BitwardenManager, BitwardenCredential};
 use session::{SessionManager, UserSession, UserData};
 use sqlx::PgPool;
-use redis::Client;
 use anyhow::{Result, Context};
 use chrono;
 
