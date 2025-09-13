@@ -17,37 +17,16 @@ help: ## Show this help message
 
 # Setup and Installation
 install: ## Install all dependencies (Rust + Node.js + TagUI)
-	@echo "$(YELLOW)Installing Codialog dependencies...$(NC)"
-	@if ! command -v cargo >/dev/null 2>&1; then \
-		echo "$(RED)Error: Rust/Cargo not found. Install from https://rustup.rs/$(NC)"; \
-		exit 1; \
-	fi
-	@if ! command -v npm >/dev/null 2>&1; then \
-		echo "$(RED)Error: Node.js/npm not found. Install Node.js first$(NC)"; \
-		exit 1; \
-	fi
-	npm install
-	cargo install tauri-cli
-	@echo "$(GREEN)Dependencies installed successfully!$(NC)"
+	@chmod +x scripts/makefile-scripts/install.sh
+	@./scripts/makefile-scripts/install.sh
 
 install-tagui: ## Install TagUI for automation
-	@echo "$(YELLOW)Installing TagUI...$(NC)"
-	@if [ ! -d "tagui" ]; then \
-		git clone https://github.com/aisingapore/tagui && \
-		cd tagui && npm install && \
-		echo "$(GREEN)TagUI installed successfully!$(NC)"; \
-	else \
-		echo "$(YELLOW)TagUI already exists$(NC)"; \
-	fi
+	@chmod +x scripts/makefile-scripts/install-tagui.sh
+	@./scripts/makefile-scripts/install-tagui.sh
 
 setup: install install-tagui ## Complete setup (install all dependencies)
-	@echo "$(YELLOW)Setting up environment...$(NC)"
-	@if [ ! -f ".env" ]; then \
-		cp .env.example .env && \
-		echo "$(GREEN)Created .env file from template$(NC)"; \
-	fi
-	mkdir -p uploads logs
-	@echo "$(GREEN)Setup completed! Run 'make dev' to start development$(NC)"
+	@chmod +x scripts/makefile-scripts/setup.sh
+	@./scripts/makefile-scripts/setup.sh
 
 # Development
 dev: ## Start development server
@@ -78,17 +57,10 @@ check: lint test ## Run linting and tests
 
 # Project Management
 clean: ## Clean build artifacts and dependencies
-	@echo "$(YELLOW)Cleaning project...$(NC)"
-	rm -rf node_modules
-	rm -rf src-tauri/target
-	rm -rf coverage
-	rm -rf dist
-	rm -rf uploads/*
-	rm -rf logs/*
-	@echo "$(GREEN)Project cleaned!$(NC)"
+	@chmod +x scripts/makefile-scripts/clean.sh
+	@./scripts/makefile-scripts/clean.sh
 
 reset: clean install ## Reset project (clean + reinstall)
-	@echo "$(GREEN)Project reset completed!$(NC)"
 
 # File Operations
 create-script: ## Create new DSL script (usage: make create-script NAME=script_name)
@@ -96,54 +68,30 @@ create-script: ## Create new DSL script (usage: make create-script NAME=script_n
 		echo "$(RED)Error: Please provide script name. Usage: make create-script NAME=my_script$(NC)"; \
 		exit 1; \
 	fi
-	@echo "// New DSL Script: $(NAME)" > scripts/$(NAME).codialog
-	@echo "// Created: $$(date)" >> scripts/$(NAME).codialog
-	@echo "" >> scripts/$(NAME).codialog
-	@echo "// Add your DSL commands here" >> scripts/$(NAME).codialog
-	@echo "click \"#example\"" >> scripts/$(NAME).codialog
-	@echo "type \"#field\" \"value\"" >> scripts/$(NAME).codialog
-	@echo "$(GREEN)Created new script: scripts/$(NAME).codialog$(NC)"
+	@chmod +x scripts/makefile-scripts/create-script.sh
+	@./scripts/makefile-scripts/create-script.sh $(NAME)
 
 list-scripts: ## List all available DSL scripts
-	@echo "$(YELLOW)Available DSL scripts:$(NC)"
-	@find scripts -name "*.codialog" -exec basename {} .codialog \; | sort | sed 's/^/  - /'
+	@chmod +x scripts/makefile-scripts/list-scripts.sh
+	@./scripts/makefile-scripts/list-scripts.sh
 
 # Information
 info: ## Show project information
-	@echo "$(YELLOW)Codialog Project Information$(NC)"
-	@echo "Version: $$(grep '"version":' package.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')"
-	@echo "Node.js: $$(node --version 2>/dev/null || echo 'Not installed')"
-	@echo "npm: $$(npm --version 2>/dev/null || echo 'Not installed')"
-	@echo "Rust: $$(rustc --version 2>/dev/null || echo 'Not installed')"
-	@echo "Cargo: $$(cargo --version 2>/dev/null || echo 'Not installed')"
-	@echo "Tauri CLI: $$(tauri --version 2>/dev/null || echo 'Not installed')"
-	@echo "TagUI: $$(if [ -d 'tagui' ]; then echo 'Installed'; else echo 'Not installed'; fi)"
+	@chmod +x scripts/makefile-scripts/info.sh
+	@./scripts/makefile-scripts/info.sh
 
 status: ## Show project status
-	@echo "$(YELLOW)Project Status:$(NC)"
-	@echo "Backend files: $$(find src-tauri/src -name "*.rs" | wc -l) Rust files"
-	@echo "Frontend files: $$(find src -name "*.html" -o -name "*.js" -o -name "*.css" | wc -l) files"
-	@echo "DSL scripts: $$(find scripts -name "*.codialog" 2>/dev/null | wc -l) scripts"
-	@echo "Dependencies: $$(if [ -d 'node_modules' ]; then echo 'Installed'; else echo 'Not installed'; fi)"
-	@echo "TagUI: $$(if [ -d 'tagui' ]; then echo 'Ready'; else echo 'Not installed'; fi)"
+	@chmod +x scripts/makefile-scripts/status.sh
+	@./scripts/makefile-scripts/status.sh
 
 # Health Checks
 health: ## Check if services are running
-	@echo "$(YELLOW)Checking service health...$(NC)"
-	@curl -s http://localhost:4000/health >/dev/null && \
-		echo "$(GREEN)✓ Backend API (port 4000)$(NC)" || \
-		echo "$(RED)✗ Backend API not running$(NC)"
-	@curl -s http://localhost:1420 >/dev/null && \
-		echo "$(GREEN)✓ Frontend (port 1420)$(NC)" || \
-		echo "$(RED)✗ Frontend not running$(NC)"
+	@chmod +x scripts/makefile-scripts/health.sh
+	@./scripts/makefile-scripts/health.sh
 
 logs: ## Show application logs
-	@echo "$(YELLOW)Application logs:$(NC)"
-	@if [ -f "logs/codialog.log" ]; then \
-		tail -f logs/codialog.log; \
-	else \
-		echo "$(RED)No log file found$(NC)"; \
-	fi
+	@chmod +x scripts/makefile-scripts/logs.sh
+	@./scripts/makefile-scripts/logs.sh
 
 # Quick Start
 start: setup dev ## Complete setup and start development (first time users)
@@ -197,19 +145,13 @@ docker-clean: ## Clean Docker containers, volumes, and networks
 # Legacy Database Management (replaced by newer targets below)
 
 db-backup: ## Create database backup
-	@echo "$(YELLOW)Creating database backup...$(NC)"
-	@mkdir -p data/backups
-	@docker exec codialog-postgres pg_dump -U $${POSTGRES_USER:-codialog} $${POSTGRES_DB:-codialog} > data/backups/backup_$$(date +%Y%m%d_%H%M%S).sql
-	@echo "$(GREEN)Database backup created in data/backups/$(NC)"
+	@chmod +x scripts/makefile-scripts/db-backup.sh
+	@./scripts/makefile-scripts/db-backup.sh
 
 # Bitwarden Management  
 bw-status: ## Check Bitwarden CLI status
-	@echo "$(YELLOW)Checking Bitwarden status...$(NC)"
-	@if docker ps | grep -q codialog-bitwarden-cli; then \
-		docker exec codialog-bitwarden-cli bw status; \
-	else \
-		echo "$(RED)Bitwarden CLI container not running$(NC)"; \
-	fi
+	@chmod +x scripts/makefile-scripts/bw-status.sh
+	@./scripts/makefile-scripts/bw-status.sh
 
 bw-sync: ## Sync Bitwarden vault
 	@echo "$(YELLOW)Syncing Bitwarden vault...$(NC)"
@@ -232,19 +174,13 @@ dev-full: docker-up dev ## Start all services and development server
 
 # Health Checks Enhanced
 health-all: ## Check health of all services (app + Docker)
-	@echo "$(YELLOW)Checking all service health...$(NC)"
-	@make health
-	@echo ""
-	@make docker-status
-	@echo ""
-	@curl -s http://localhost:8080/alive >/dev/null && \
-		echo "$(GREEN)✓ Vaultwarden (port 8080)$(NC)" || \
-		echo "$(RED)✗ Vaultwarden not accessible$(NC)"
+	@chmod +x scripts/makefile-scripts/health-all.sh
+	@./scripts/makefile-scripts/health-all.sh
 
 # Logs Management
 logs-app: ## Show application logs only
-	@echo "$(YELLOW)Application logs:$(NC)"
-	@find logs -name "*.log" -exec tail -f {} +
+	@chmod +x scripts/makefile-scripts/logs-app.sh
+	@./scripts/makefile-scripts/logs-app.sh
 
 logs-docker: ## Show Docker service logs
 	make docker-logs
@@ -255,33 +191,21 @@ logs-all: ## Show all logs (app + Docker)
 
 # Environment management
 env-check: ## Validate environment configuration  
-	@echo "$(YELLOW)Checking environment...$(NC)"
-	@if [ ! -f ".env" ]; then \
-		echo "$(RED)No .env file found. Run 'make init' first$(NC)"; \
-		exit 1; \
-	fi
-	@echo "$(GREEN)Environment configuration found$(NC)"
+	@chmod +x scripts/makefile-scripts/env-check.sh
+	@./scripts/makefile-scripts/env-check.sh
 
 env-template: ## Create .env from template
-	@if [ ! -f ".env" ]; then \
-		cp .env.example .env; \
-		echo "$(GREEN)Created .env from template$(NC)"; \
-	else \
-		echo "$(YELLOW).env already exists$(NC)"; \
-	fi
+	@chmod +x scripts/makefile-scripts/env-template.sh
+	@./scripts/makefile-scripts/env-template.sh
 
 # Data Management
 data-clean: ## Clean application data (uploads, logs, sessions)
-	@echo "$(YELLOW)Cleaning application data...$(NC)"
-	rm -rf data/uploads/* data/sessions/* data/logs/* 2>/dev/null || true
-	rm -rf src-tauri/data/uploads/* src-tauri/data/sessions/* src-tauri/data/logs/* 2>/dev/null || true
-	@echo "$(GREEN)Application data cleaned$(NC)"
+	@chmod +x scripts/makefile-scripts/data-clean.sh
+	@./scripts/makefile-scripts/data-clean.sh
 
 data-backup: ## Backup application data
-	@echo "$(YELLOW)Creating data backup...$(NC)"
-	@mkdir -p data/backups
-	@tar -czf data/backups/data_backup_$$(date +%Y%m%d_%H%M%S).tar.gz data/ src-tauri/data/
-	@echo "$(GREEN)Data backup created in data/backups/$(NC)"
+	@chmod +x scripts/makefile-scripts/data-backup.sh
+	@./scripts/makefile-scripts/data-backup.sh
 
 # Test Management
 test: ## Run all tests
@@ -297,81 +221,51 @@ test-integration: ## Run integration tests only
 	cd src-tauri && cargo test --features integration_tests --verbose
 
 test-coverage: ## Generate test coverage report
-	@echo "$(YELLOW)📊 Generating test coverage report...$(NC)"
-	cd src-tauri && cargo install cargo-tarpaulin --locked 2>/dev/null || true
-	cd src-tauri && cargo tarpaulin --out Html --output-dir ../coverage --timeout 300
-	@echo "$(GREEN)Coverage report generated in coverage/tarpaulin-report.html$(NC)"
+	@chmod +x scripts/makefile-scripts/test-coverage.sh
+	@./scripts/makefile-scripts/test-coverage.sh
 
 test-watch: ## Run tests in watch mode
-	@echo "$(YELLOW)👀 Running tests in watch mode...$(NC)"
-	cd src-tauri && cargo install cargo-watch --locked 2>/dev/null || true
-	cd src-tauri && cargo watch -x test
+	@chmod +x scripts/makefile-scripts/test-watch.sh
+	@./scripts/makefile-scripts/test-watch.sh
 
 test-bench: ## Run performance benchmarks
 	@echo "$(YELLOW)⚡ Running performance benchmarks...$(NC)"
 	cd src-tauri && cargo bench
 
 test-clean: ## Clean test artifacts
-	@echo "$(YELLOW)🧹 Cleaning test artifacts...$(NC)"
-	cd src-tauri && cargo clean
-	rm -rf coverage/ 2>/dev/null || true
-	@echo "$(GREEN)Test artifacts cleaned$(NC)"
+	@chmod +x scripts/makefile-scripts/test-clean.sh
+	@./scripts/makefile-scripts/test-clean.sh
 
 # Database Management
 db-migrate: ## Run database migrations
-	@echo "$(YELLOW)🗄️  Running database migrations...$(NC)"
-	@if docker exec codialog-postgres pg_isready -U codialog_user > /dev/null 2>&1; then \
-		echo "$(GREEN)Database is ready, running migrations...$(NC)"; \
-		cd src-tauri && cargo run --bin migrate 2>/dev/null || echo "$(YELLOW)Migration binary not found, skipping$(NC)"; \
-	else \
-		echo "$(RED)Database is not ready, please start it first with 'make docker-up'$(NC)"; \
-	fi
+	@chmod +x scripts/makefile-scripts/db-migrate.sh
+	@./scripts/makefile-scripts/db-migrate.sh
 
 db-reset: ## Reset database (drop and recreate)
-	@echo "$(YELLOW)🗄️  Resetting database...$(NC)"
-	docker exec codialog-postgres psql -U codialog_user -d postgres -c "DROP DATABASE IF EXISTS codialog;"
-	docker exec codialog-postgres psql -U codialog_user -d postgres -c "CREATE DATABASE codialog;"
-	@echo "$(GREEN)Database reset completed$(NC)"
+	@chmod +x scripts/makefile-scripts/db-reset.sh
+	@./scripts/makefile-scripts/db-reset.sh
 
 db-seed: ## Seed database with test data
-	@echo "$(YELLOW)🌱 Seeding database with test data...$(NC)"
-	docker exec codialog-postgres psql -U codialog_user -d codialog -c "\
-		INSERT INTO user_sessions (session_id, user_data, created_at, updated_at, expires_at, is_active) VALUES \
-		('test-session-1', '{\"email\":\"test@example.com\",\"name\":\"Test User\"}', NOW(), NOW(), NOW() + INTERVAL '1 day', true), \
-		('test-session-2', '{\"email\":\"demo@example.com\",\"name\":\"Demo User\"}', NOW(), NOW(), NOW() + INTERVAL '1 day', true) \
-		ON CONFLICT (session_id) DO NOTHING;"
-	@echo "$(GREEN)Database seeded with test data$(NC)"
+	@chmod +x scripts/makefile-scripts/db-seed.sh
+	@./scripts/makefile-scripts/db-seed.sh
 
 # Performance and Monitoring
 perf-test: ## Run performance tests
-	@echo "$(YELLOW)⚡ Running performance tests...$(NC)"
-	@echo "Testing API endpoints..."
-	@for endpoint in "/health" "/api/status"; do \
-		echo "Testing $$endpoint..."; \
-		curl -w "Time: %{time_total}s\n" -s "http://localhost:3000$$endpoint" -o /dev/null || true; \
-	done
+	@chmod +x scripts/makefile-scripts/perf-test.sh
+	@./scripts/makefile-scripts/perf-test.sh
 
 monitor: ## Start monitoring dashboard
-	@echo "$(YELLOW)📊 Starting monitoring dashboard...$(NC)"
-	@echo "Database status:"
-	@docker exec codialog-postgres pg_isready -U codialog_user || echo "Database not ready"
-	@echo "Redis status:"
-	@docker exec codialog-redis redis-cli ping || echo "Redis not ready"
-	@echo "Application logs (last 10 lines):"
-	@tail -n 10 logs/app.log 2>/dev/null || echo "No app logs found"
+	@chmod +x scripts/makefile-scripts/monitor.sh
+	@./scripts/makefile-scripts/monitor.sh
 
 # Maintenance
 maintenance-mode: ## Enable maintenance mode
-	@echo "$(YELLOW)🚧 Enabling maintenance mode...$(NC)"
-	@echo "maintenance" > .maintenance
-	docker pause codialog-app 2>/dev/null || true
-	@echo "$(GREEN)Maintenance mode enabled$(NC)"
+	@chmod +x scripts/makefile-scripts/maintenance-mode.sh
+	@./scripts/makefile-scripts/maintenance-mode.sh
 
 maintenance-off: ## Disable maintenance mode
-	@echo "$(YELLOW)🔧 Disabling maintenance mode...$(NC)"
-	@rm -f .maintenance
-	docker unpause codialog-app 2>/dev/null || true
-	@echo "$(GREEN)Maintenance mode disabled$(NC)"
+	@chmod +x scripts/makefile-scripts/maintenance-off.sh
+	@./scripts/makefile-scripts/maintenance-off.sh
 
 # Documentation
 docs: ## Generate documentation

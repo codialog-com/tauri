@@ -3,7 +3,6 @@ use reqwest;
 use tracing::{info, error, debug, warn};
 use crate::tagui::escape_for_dsl;
 use sqlx::{PgPool, Row};
-use chrono::Utc;
 use anyhow::Result;
 use std::collections::HashMap;
 

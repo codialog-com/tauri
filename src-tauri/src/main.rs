@@ -19,14 +19,13 @@ mod session;
 mod tests;
 
 use axum::{
+    extract::{Json, Query, State},
     routing::{get, post},
     Router,
-    extract::{Json, State, Query},
-    response::IntoResponse,
-    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value as JsonValue};
+use serde_json::json;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -34,10 +33,10 @@ use tracing::{info, error, warn, debug, instrument, span, Level};
 use logging::LogManager;
 use bitwarden::{BitwardenManager, BitwardenCredential};
 use session::{SessionManager, UserSession, UserData};
-use std::collections::HashMap;
 use sqlx::PgPool;
-use redis::Client as RedisClient;
+use redis::Client;
 use anyhow::{Result, Context};
+use chrono;
 
 #[derive(Clone)]
 struct AppState {
