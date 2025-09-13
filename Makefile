@@ -30,28 +30,30 @@ setup: install install-tagui ## Complete setup (install all dependencies)
 
 # Development
 dev: ## Start development server
-	@echo "$(YELLOW)Starting Codialog in development mode...$(NC)"
-	npm run dev
+	@chmod +x scripts/makefile-scripts/dev.sh
+	@./scripts/makefile-scripts/dev.sh
 
 build: ## Build production application
-	@echo "$(YELLOW)Building Codialog for production...$(NC)"
-	npm run build
+	@chmod +x scripts/makefile-scripts/build.sh
+	@./scripts/makefile-scripts/build.sh
 
 # Legacy Testing (replaced by Rust tests in Test Management section)
 test-e2e: ## Run E2E tests only
-	npm run test:e2e
+	@chmod +x scripts/makefile-scripts/test-e2e.sh
+	@./scripts/makefile-scripts/test-e2e.sh
 
 coverage: ## Generate test coverage report
-	npm run test:coverage
-	@echo "$(GREEN)Coverage report generated in coverage/index.html$(NC)"
+	@chmod +x scripts/makefile-scripts/coverage.sh
+	@./scripts/makefile-scripts/coverage.sh
 
 # Code Quality
 lint: ## Lint code (JavaScript + Rust)
-	@echo "$(YELLOW)Linting code...$(NC)"
-	npm run lint
+	@chmod +x scripts/makefile-scripts/lint.sh
+	@./scripts/makefile-scripts/lint.sh
 
 format: ## Format code
-	npm run format
+	@chmod +x scripts/makefile-scripts/format.sh
+	@./scripts/makefile-scripts/format.sh
 
 check: lint test ## Run linting and tests
 
@@ -98,49 +100,45 @@ start: setup dev ## Complete setup and start development (first time users)
 
 # Debug mode
 debug: ## Start in debug mode with verbose logging
-	RUST_LOG=debug npm run dev
+	@chmod +x scripts/makefile-scripts/debug.sh
+	@./scripts/makefile-scripts/debug.sh
 
 # Production deployment helpers
 build-release: ## Build optimized release version
-	npm run build
-	@echo "$(GREEN)Release build completed!$(NC)"
+	@chmod +x scripts/makefile-scripts/build-release.sh
+	@./scripts/makefile-scripts/build-release.sh
 
 # Development utilities
 watch-backend: ## Watch backend files for changes
-	@echo "$(YELLOW)Watching Rust backend files...$(NC)"
-	cargo watch -x "check --manifest-path src-tauri/Cargo.toml"
+	@chmod +x scripts/makefile-scripts/watch-backend.sh
+	@./scripts/makefile-scripts/watch-backend.sh
 
 serve-docs: ## Serve documentation (if available)
-	@if [ -d "docs" ]; then \
-		python3 -m http.server 8080 -d docs; \
-	else \
-		echo "$(RED)No docs directory found$(NC)"; \
-	fi
+	@chmod +x scripts/makefile-scripts/serve-docs.sh
+	@./scripts/makefile-scripts/serve-docs.sh
 
 # Docker and Services Management
 docker-up: ## Start all Docker services (PostgreSQL, Redis, Vaultwarden, Bitwarden CLI)
-	@echo "$(YELLOW)Starting Docker services...$(NC)"
-	./scripts/init/docker-setup.sh
+	@chmod +x scripts/makefile-scripts/docker-up.sh
+	@./scripts/makefile-scripts/docker-up.sh
 
 docker-down: ## Stop all Docker services
-	@echo "$(YELLOW)Stopping Docker services...$(NC)"
-	docker-compose -f docker-compose.bitwarden.yml down
+	@chmod +x scripts/makefile-scripts/docker-down.sh
+	@./scripts/makefile-scripts/docker-down.sh
 
 docker-restart: docker-down docker-up ## Restart all Docker services
 
 docker-logs: ## Show logs from all Docker services
-	docker-compose -f docker-compose.bitwarden.yml logs -f
+	@chmod +x scripts/makefile-scripts/docker-logs.sh
+	@./scripts/makefile-scripts/docker-logs.sh
 
 docker-status: ## Check status of all Docker services
-	@echo "$(YELLOW)Docker Services Status:$(NC)"
-	@docker-compose -f docker-compose.bitwarden.yml ps
+	@chmod +x scripts/makefile-scripts/docker-status.sh
+	@./scripts/makefile-scripts/docker-status.sh
 
 docker-clean: ## Clean Docker containers, volumes, and networks
-	@echo "$(YELLOW)Cleaning Docker resources...$(NC)"
-	docker-compose -f docker-compose.bitwarden.yml down -v
-	docker volume prune -f
-	docker network prune -f
-	@echo "$(GREEN)Docker resources cleaned$(NC)"
+	@chmod +x scripts/makefile-scripts/docker-clean.sh
+	@./scripts/makefile-scripts/docker-clean.sh
 
 # Legacy Database Management (replaced by newer targets below)
 
@@ -154,20 +152,21 @@ bw-status: ## Check Bitwarden CLI status
 	@./scripts/makefile-scripts/bw-status.sh
 
 bw-sync: ## Sync Bitwarden vault
-	@echo "$(YELLOW)Syncing Bitwarden vault...$(NC)"
-	@docker exec codialog-bitwarden-cli bw sync
+	@chmod +x scripts/makefile-scripts/bw-sync.sh
+	@./scripts/makefile-scripts/bw-sync.sh
 
 bw-unlock: ## Unlock Bitwarden vault (requires master password)
-	@echo "$(YELLOW)Unlocking Bitwarden vault...$(NC)"
-	@docker exec -it codialog-bitwarden-cli bw unlock
+	@chmod +x scripts/makefile-scripts/bw-unlock.sh
+	@./scripts/makefile-scripts/bw-unlock.sh
 
 # Application Setup and Management
 init: ## Initialize application (complete setup)
-	@echo "$(YELLOW)Initializing Codialog application...$(NC)"
-	./scripts/init/setup.sh
+	@chmod +x scripts/makefile-scripts/init.sh
+	@./scripts/makefile-scripts/init.sh
 
 init-docker: ## Initialize Docker environment only
-	./scripts/init/docker-setup.sh
+	@chmod +x scripts/makefile-scripts/init-docker.sh
+	@./scripts/makefile-scripts/init-docker.sh
 
 # Development with Services
 dev-full: docker-up dev ## Start all services and development server
@@ -186,8 +185,8 @@ logs-docker: ## Show Docker service logs
 	make docker-logs
 
 logs-all: ## Show all logs (app + Docker)
-	@echo "$(YELLOW)Starting log monitoring (Ctrl+C to stop)...$(NC)"
-	@make logs-app & make logs-docker
+	@chmod +x scripts/makefile-scripts/logs-all.sh
+	@./scripts/makefile-scripts/logs-all.sh
 
 # Environment management
 env-check: ## Validate environment configuration  
@@ -209,16 +208,16 @@ data-backup: ## Backup application data
 
 # Test Management
 test: ## Run all tests
-	@echo "$(YELLOW)🧪 Running all tests...$(NC)"
-	cd src-tauri && cargo test --verbose
+	@chmod +x scripts/makefile-scripts/test.sh
+	@./scripts/makefile-scripts/test.sh
 
 test-unit: ## Run unit tests only
-	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
-	cd src-tauri && cargo test --lib --verbose
+	@chmod +x scripts/makefile-scripts/test-unit.sh
+	@./scripts/makefile-scripts/test-unit.sh
 
 test-integration: ## Run integration tests only
-	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
-	cd src-tauri && cargo test --features integration_tests --verbose
+	@chmod +x scripts/makefile-scripts/test-integration.sh
+	@./scripts/makefile-scripts/test-integration.sh
 
 test-coverage: ## Generate test coverage report
 	@chmod +x scripts/makefile-scripts/test-coverage.sh
@@ -229,8 +228,8 @@ test-watch: ## Run tests in watch mode
 	@./scripts/makefile-scripts/test-watch.sh
 
 test-bench: ## Run performance benchmarks
-	@echo "$(YELLOW)⚡ Running performance benchmarks...$(NC)"
-	cd src-tauri && cargo bench
+	@chmod +x scripts/makefile-scripts/test-bench.sh
+	@./scripts/makefile-scripts/test-bench.sh
 
 test-clean: ## Clean test artifacts
 	@chmod +x scripts/makefile-scripts/test-clean.sh
@@ -269,16 +268,12 @@ maintenance-off: ## Disable maintenance mode
 
 # Documentation
 docs: ## Generate documentation
-	@echo "$(YELLOW)📚 Generating documentation...$(NC)"
-	cd src-tauri && cargo doc --no-deps --open 2>/dev/null || cargo doc --no-deps
-	@echo "$(GREEN)Documentation generated and opened in browser$(NC)"
+	@chmod +x scripts/makefile-scripts/docs.sh
+	@./scripts/makefile-scripts/docs.sh
 
 docs-api: ## Generate API documentation
-	@echo "$(YELLOW)📋 API Documentation available at:$(NC)"
-	@echo "  - Health Check: http://localhost:3000/health"
-	@echo "  - DSL Generation: POST http://localhost:3000/dsl/generate"
-	@echo "  - Bitwarden Login: POST http://localhost:3000/bitwarden/login"
-	@echo "  - Session Management: GET/POST http://localhost:3000/session"
+	@chmod +x scripts/makefile-scripts/docs-api.sh
+	@./scripts/makefile-scripts/docs-api.sh
 
 # Quick Commands
 full-reset: docker-down clean data-clean test-clean init docker-up ## Complete reset (clean everything and reinitialize)
