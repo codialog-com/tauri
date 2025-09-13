@@ -205,7 +205,7 @@ async fn generate_script_with_comprehensive_fallbacks(html: &str, user_data: &Va
     Ok(basic_navigation_script())
 }
 
-async fn generate_enhanced_form_script(html: &str, user_data: &Value) -> Result<String> {
+async fn generate_enhanced_form_script(html: &str, _user_data: &Value) -> Result<String> {
     let analyzer = FormAnalyzer::new(html);
     let mut script = String::new();
     

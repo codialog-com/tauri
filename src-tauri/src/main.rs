@@ -22,6 +22,7 @@ use axum::{
     extract::{Json, Query, State},
     routing::{get, post},
     Router,
+    response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -45,6 +46,7 @@ struct AppState {
     bitwarden_manager: Arc<Mutex<BitwardenManager>>,
     session_manager: Arc<SessionManager>,
     db_pool: PgPool,
+    redis_client: Client,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -629,16 +631,10 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     
     // Initialize database and Redis connections
-    let (db_pool, redis_client, bitwarden_manager, session_manager) = rt.block_on(async {
+    let (db_pool, bitwarden_manager, session_manager, redis_client) = rt.block_on(async {
         // Initialize database
         let db_pool = initialize_database().await
             .expect("Failed to initialize database");
-        
-        // Initialize Redis
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
-        let redis_client = RedisClient::open(redis_url)
-            .expect("Failed to create Redis client");
         
         // Initialize Bitwarden manager
         let bitwarden_server = std::env::var("BITWARDEN_SERVER")
@@ -652,13 +648,17 @@ fn main() {
         }
         
         // Initialize session manager
-        let session_manager = SessionManager::new(db_pool.clone(), redis_client.clone());
+        let session_manager = SessionManager::new(db_pool.clone());
         if let Err(e) = session_manager.initialize().await {
             error!("Failed to initialize session manager: {}", e);
             std::process::exit(1);
         }
         
-        (db_pool, redis_client, bitwarden_manager, session_manager)
+        // Initialize Redis client
+        let redis_client = redis::Client::open("redis://localhost:6379")
+            .expect("Failed to connect to Redis");
+        
+        (db_pool, bitwarden_manager, session_manager, redis_client)
     });
     
     let app_state = AppState {
@@ -667,6 +667,7 @@ fn main() {
         bitwarden_manager: Arc::new(Mutex::new(bitwarden_manager)),
         session_manager: Arc::new(session_manager),
         db_pool,
+        redis_client,
     };
 
     // Uruchom serwer HTTP w tle
