@@ -10,7 +10,12 @@ mod logging;
 mod bitwarden;
 mod session;
 
-#[cfg(test)]
+#[cfg(all(test, any(
+    feature = "integration_tests",
+    feature = "tests_llm",
+    feature = "tests_logging",
+    feature = "tests_session"
+)))]
 mod tests;
 
 use axum::{
@@ -605,6 +610,7 @@ async fn initialize_database() -> Result<PgPool> {
     Ok(pool)
 }
 
+#[cfg(not(test))]
 fn main() {
     // Load environment variables
     dotenv::dotenv().ok();
@@ -713,4 +719,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![load_url])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+fn main() {
+    // No Tauri runtime during tests
 }

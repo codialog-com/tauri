@@ -294,7 +294,7 @@ test-unit: ## Run unit tests only
 
 test-integration: ## Run integration tests only
 	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
-	cd src-tauri && cargo test integration_tests --verbose
+	cd src-tauri && cargo test --features integration_tests --verbose
 
 test-coverage: ## Generate test coverage report
 	@echo "$(YELLOW)📊 Generating test coverage report...$(NC)"

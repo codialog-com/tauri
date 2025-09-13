@@ -2,68 +2,44 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "Codialog",
   "version": "0.1.0",
+  "identifier": "com.codialog.app",
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
     "frontendDist": "../src"
   },
-  "tauri": {
-    "bundle": {
-      "active": true,
-      "category": "DeveloperTool",
-      "copyright": "",
-      "deb": {
-        "depends": []
-      },
-      "externalBin": [],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "com.codialog.app",
-      "longDescription": "",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "shortDescription": "",
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
-      }
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "",
+    "externalBin": [],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "longDescription": "",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
     },
-    "security": {
-      "csp": "default-src 'self' 'unsafe-inline' data: blob: https:;"
-    },
+    "shortDescription": "",
+    "targets": "all"
+  },
+  "app": {
     "windows": [
       {
-        "title": "Codialog - Automatyzacja CV",
+        "title": "Codialog",
         "width": 900,
         "height": 800,
         "resizable": true,
         "fullscreen": false
       }
-    ],
-    "plugins": {
-      "shell": {
-        "open": true,
-        "execute": true,
-        "sidecar": true,
-        "scope": [
-          {
-            "name": "*",
-            "sidecar": true
-          }
-        ]
-      }
-    }
+    ]
   }
 }

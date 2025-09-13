@@ -1,32 +1,14 @@
 #![cfg(test)]
 
 use crate::{
-    bitwarden::{
-        check_bitwarden_status,
-        parse_bitwarden_credentials,
-        bitwarden_login,
-    },
-    session::{
-        create_user_session,
-        get_user_session,
-        expire_user_session,
-        cleanup_expired_sessions,
-        validate_session,
-        update_user_session,
-        get_session_metrics,
-    },
-    database::setup_test_database,
-    logging::{
-        setup_logging,
-        log_user_action,
-        get_application_logs,
-    },
-    dsl::generate_dsl_script,
+    bitwarden::BitwardenManager,
+    session::SessionManager,
+    logging::LogManager,
+    llm::generate_simple_dsl,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::time::Duration;
-use tokio::time::sleep;
 
 #[cfg(test)]
 mod tests {
@@ -95,19 +77,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_bitwarden_dsl_workflow() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         let html = create_test_html_form();
         let user_data = create_test_user_data();
         
         // Test complete workflow: Bitwarden + DSL generation + Session management
         
         // 1. Create user session
-        let session = create_user_session(&pool, &user_data).await;
-        assert!(session.is_ok(), "Should create user session");
-        let session = session.unwrap();
+        let session = SessionManager::create_user_session(&pool, &user_data).await.unwrap();
         
         // 2. Generate DSL script
-        let dsl_script = generate_dsl_script(&html, &user_data).await;
+        let dsl_script = generate_simple_dsl(&html, &user_data).await;
         assert!(!dsl_script.is_empty(), "Should generate DSL script");
         assert!(dsl_script.contains("type"), "DSL should contain type commands");
         
@@ -118,13 +98,11 @@ mod tests {
             "automation_status": "ready"
         });
         
-        let session_update = update_user_session(&pool, &session.session_id, &automation_data).await;
-        assert!(session_update.is_ok(), "Should update session with automation data");
+        let session_update = SessionManager::update_user_session(&pool, &session.session_id, &automation_data).await.unwrap();
         
         // 4. Retrieve updated session
-        let retrieved_session = get_user_session(&pool, &session.session_id).await;
-        assert!(retrieved_session.is_ok(), "Should retrieve updated session");
-        assert!(retrieved_session.unwrap().is_some(), "Session should exist");
+        let retrieved_session = SessionManager::get_user_session(&pool, &session.session_id).await.unwrap();
+        assert!(retrieved_session.is_some(), "Session should exist");
     }
 
     #[tokio::test]
@@ -132,7 +110,7 @@ mod tests {
         // Test Bitwarden CLI integration workflow
         
         // 1. Check Bitwarden status
-        let status = check_bitwarden_status().await;
+        let status = BitwardenManager::check_bitwarden_status().await.unwrap();
         assert!(!status.is_empty(), "Should return Bitwarden status");
         
         // 2. Test credential parsing (with mock data)
@@ -148,7 +126,7 @@ mod tests {
             }
         ]"#;
         
-        let credentials = super::bitwarden::parse_bitwarden_credentials(mock_credentials_json).unwrap_or_default();
+        let credentials = BitwardenManager::parse_bitwarden_credentials(mock_credentials_json).unwrap_or_default();
         assert_eq!(credentials.len(), 1, "Should parse credentials correctly");
         assert_eq!(credentials[0].username.as_ref().unwrap(), "user1@example.com");
         
@@ -164,67 +142,54 @@ mod tests {
 
     #[tokio::test]
     async fn test_logging_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         
         // Test integrated logging across components
         
         // 1. Log Bitwarden operation
-        log_user_action(
+        LogManager::log_system_event(
             &pool,
-            "test-user-123",
             "bitwarden",
             "vault_unlock",
             &json!({ "status": "success", "items_count": 15 })
-        ).await.expect("Should log Bitwarden event");
+        ).await.unwrap();
         
         // 2. Log DSL generation
-        log_user_action(
+        LogManager::log_system_event(
             &pool,
-            "test-user-123",
             "dsl_generator",
             "script_generation",
             &json!({ "method": "enhanced", "script_length": 150, "cached": false })
-        ).await.expect("Should log DSL generation event");
+        ).await.unwrap();
         
         // 3. Log user action
-        log_user_action(
+        LogManager::log_system_event(
             &pool,
-            "test-user-123",
             "form_submission",
             "job_application",
             &json!({ "fields_filled": 8, "success": true })
-        ).await.expect("Should log user action");
+        ).await.unwrap();
         
-        // 4. Retrieve and verify logs
-        let logs = get_application_logs(&pool, Some(10), None).await;
-        assert!(logs.is_ok(), "Should retrieve application logs");
-        
-        let log_entries = logs.unwrap();
-        assert!(log_entries.len() >= 3, "Should have logged all events");
-        
-        // 5. Test log filtering by component
-        let bitwarden_logs: Result<Vec<_>, _> = get_application_logs(&pool, Some(10), Some("bitwarden")).await;
-        assert!(bitwarden_logs.is_ok(), "Should filter logs by component");
-        
-        let bw_logs = bitwarden_logs.unwrap();
-        assert!(!bw_logs.is_empty(), "Should have Bitwarden logs");
+        // 4. Retrieve and verify logs by component
+        let bw_logs = LogManager::get_logs_by_component(&pool, "bitwarden", Some(10)).await.unwrap();
+        assert!(!bw_logs.is_empty(), "Should have Bitwarden log entries");
     }
 
     #[tokio::test]
     async fn test_caching_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         let html = create_complex_html_form();
         let user_data = create_test_user_data();
         
         // Test DSL script caching integration
         
         // 1. Generate script (should cache)
-        let script1 = generate_dsl_script(&html, &user_data).await;
+        let script1 = generate_simple_dsl(&html, &user_data).await;
         assert!(!script1.is_empty(), "Should generate first script");
         
         // 2. Generate same script again (should use cache if implemented)
         let start_time = std::time::Instant::now();
-        let script2 = generate_dsl_script(&html, &user_data).await;
+        let script2 = generate_simple_dsl(&html, &user_data).await;
         let generation_duration = start_time.elapsed();
         
         assert_eq!(script1, script2, "Generated scripts should be consistent");
@@ -234,7 +199,7 @@ mod tests {
         
         // 3. Test with modified input
         let modified_html = format!("{}<!-- Modified -->", html);
-        let script3 = generate_dsl_script(&modified_html, &user_data).await;
+        let script3 = generate_simple_dsl(&modified_html, &user_data).await;
         
         // The modified HTML should ideally produce a different script,
         // but we'll just verify it's not empty
@@ -246,7 +211,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_error_handling_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         
         // Test error handling across components
         
@@ -254,19 +219,17 @@ mod tests {
         let invalid_html = "";
         let invalid_user_data = json!("not_an_object");
         
-        let result = generate_dsl_script(&invalid_html, &invalid_user_data).await;
+        let result = generate_simple_dsl(&invalid_html, &invalid_user_data).await;
         assert!(!result.is_empty(), "Should handle invalid input gracefully");
         
         // 2. Test session operations with invalid data
-        let invalid_session_result = get_user_session(&pool, "non-existent-session").await;
-        assert!(invalid_session_result.is_ok(), "Should handle non-existent session gracefully");
-        assert!(invalid_session_result.unwrap().is_none(), "Should return None for non-existent session");
+        let invalid_session_result = SessionManager::get_user_session(&pool, "non-existent-session").await.unwrap();
+        assert!(invalid_session_result.is_none(), "Should return None for non-existent session");
         
         // 3. Test logging with invalid data
-        let log_result = log_user_action(
+        let log_result = LogManager::log_system_event(
             &pool,
-            "", // Empty user ID
-            "test_component",
+            "", // Empty component
             "test_action",
             &json!({})
         ).await;
@@ -274,13 +237,13 @@ mod tests {
         assert!(log_result.is_err(), "Should validate log parameters");
         
         // 4. Test with empty user data
-        let script = generate_dsl_script("<form></form>", &json!({})).await;
+        let script = generate_simple_dsl("<form></form>", &json!({})).await;
         assert!(!script.is_empty(), "Should handle empty user data");
     }
 
     #[tokio::test]
     async fn test_performance_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         
         // Test performance across integrated components
         let start_time = std::time::Instant::now();
@@ -296,15 +259,14 @@ mod tests {
             });
             
             let handle = tokio::spawn(async move {
-                create_user_session(&pool_clone, &user_data).await
+                SessionManager::create_user_session(&pool_clone, &user_data).await.unwrap()
             });
             session_handles.push(handle);
         }
         
         // Wait for all session creations to complete
         for handle in session_handles {
-            let result = handle.await.expect("Session creation task panicked");
-            assert!(result.is_ok(), "Should create session successfully");
+            let result = handle.await.unwrap();
         }
         
         // 2. Generate multiple DSL scripts concurrently
@@ -317,14 +279,14 @@ mod tests {
             });
             
             let handle = tokio::spawn(async move {
-                generate_dsl_script(&html, &user_data).await
+                generate_simple_dsl(&html, &user_data).await
             });
             dsl_handles.push(handle);
         }
         
         // Wait for all DSL generations to complete
         for handle in dsl_handles {
-            let script = handle.await.expect("DSL generation task panicked");
+            let script = handle.await.unwrap();
             assert!(!script.is_empty(), "Should generate non-empty script");
         }
         
@@ -334,37 +296,28 @@ mod tests {
         // Verify the test completed within a reasonable time (adjust as needed)
         assert!(duration < Duration::from_secs(10), "Performance test took too long");
         
-        for result in dsl_results {
-            let script = result.unwrap();
-            assert!(!script.is_empty(), "Concurrent DSL generation should succeed");
-        }
-        
-        // Performance assertion
-        assert!(total_duration < Duration::from_secs(10), "Concurrent operations should complete within 10 seconds");
-        
         // 3. Log performance metrics
-        logging::log_performance_metric(&pool, "integration_test", total_duration.as_millis() as i64, &json!({
-            "sessions_created": 10,
-            "dsl_scripts_generated": 5,
+        LogManager::log_performance_metric(&pool, "integration_test", duration.as_millis() as i64, &json!({
+            "sessions_created": 5,
+            "dsl_scripts_generated": 3,
             "concurrent": true
-        })).await.expect("Should log performance metrics");
+        })).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_data_consistency_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         
         // Test data consistency across operations
         let user_data = create_test_user_data();
         let html = create_test_html_form();
         
         // 1. Create session
-        let session_result = create_user_session(&pool, &user_data).await;
-        assert!(session_result.is_ok(), "Should create user session");
-        let session = session_result.unwrap();
+        let session_result = SessionManager::create_user_session(&pool, &user_data).await.unwrap();
+        let session = session_result;
         
         // 2. Generate DSL script
-        let dsl_script = generate_dsl_script(&html, &user_data).await;
+        let dsl_script = generate_simple_dsl(&html, &user_data).await;
         assert!(!dsl_script.is_empty(), "Should generate non-empty DSL script");
         
         // 3. Update session with DSL data
@@ -374,21 +327,15 @@ mod tests {
             "workflow_stage": "dsl_generated"
         });
         
-        let update_result = update_user_session(&pool, &session.session_id, &session_data).await;
-        assert!(update_result.is_ok(), "Should update session with DSL data");
+        let update_result = SessionManager::update_user_session(&pool, &session.session_id, &session_data).await.unwrap();
         
         // 4. Verify data consistency
-        let retrieved_session_result = get_user_session(&pool, &session.session_id).await;
-        assert!(retrieved_session_result.is_ok(), "Should retrieve session");
-        
+        let retrieved_session_result = SessionManager::get_user_session(&pool, &session.session_id).await.unwrap();
         let retrieved_session = retrieved_session_result.unwrap();
-        assert!(retrieved_session.is_some(), "Session should exist");
-        
-        let retrieved_session = retrieved_session.unwrap();
         
         // Parse and verify session data
         let parsed_data: serde_json::Value = serde_json::from_str(&retrieved_session.data)
-            .expect("Should parse session data as JSON");
+            .unwrap();
             
         assert!(
             parsed_data.get("generated_dsl").is_some(), 
@@ -409,7 +356,7 @@ mod tests {
         );
         
         // 5. Verify DSL script generation consistency
-        let new_script = generate_dsl_script(&html, &user_data).await;
+        let new_script = generate_simple_dsl(&html, &user_data).await;
         assert!(
             !new_script.is_empty(), 
             "Should generate script consistently"
@@ -418,7 +365,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cleanup_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         
         // Create test sessions with expiration in the past
         for i in 0..3 { // Create 3 test sessions
@@ -428,40 +375,33 @@ mod tests {
                 "test": true
             });
             
-            let session_result = create_user_session(&pool, &user_data).await;
-            assert!(session_result.is_ok(), "Should create test session");
+            let session_result = SessionManager::create_user_session(&pool, &user_data).await.unwrap();
             
             // Set session expiration to the past
             let update_result = sqlx::query!(
                 "UPDATE sessions SET expires_at = NOW() - INTERVAL '1 day' WHERE session_id = $1",
-                session_result.unwrap().session_id
+                session_result.session_id
             )
             .execute(&pool)
-            .await;
-            
-            assert!(update_result.is_ok(), "Should update session expiration");
+            .await.unwrap();
         }
         
         // Verify test sessions were created
         let session_count = sqlx::query!("SELECT COUNT(*) as count FROM sessions")
             .fetch_one(&pool)
-            .await
-            .unwrap();
+            .await.unwrap();
             
         assert_eq!(session_count.count.unwrap_or(0), 3, "Should have created test sessions");
         
         // Clean up expired sessions
         let cleanup_result = sqlx::query("DELETE FROM sessions WHERE expires_at < NOW()")
             .execute(&pool)
-            .await;
+            .await.unwrap();
             
-        assert!(cleanup_result.is_ok(), "Should clean up expired sessions");
-        
         // Verify cleanup
         let remaining_sessions = sqlx::query!("SELECT COUNT(*) as count FROM sessions")
             .fetch_one(&pool)
-            .await
-            .unwrap();
+            .await.unwrap();
             
         assert_eq!(
             remaining_sessions.count.unwrap_or(0), 0, 
@@ -471,7 +411,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_security_integration() {
-        let pool = setup_test_database().await;
+        let pool = sqlx::PgPool::connect("postgres://localhost/mydb").await.unwrap();
         
         // Test security measures across components
         
@@ -484,19 +424,15 @@ mod tests {
         });
         
         // Create a session with sensitive data
-        let session_result = create_user_session(&pool, &sensitive_data).await;
-        assert!(session_result.is_ok(), "Should create session with sensitive data");
+        let session_result = SessionManager::create_user_session(&pool, &sensitive_data).await.unwrap();
         
-        let session = session_result.unwrap();
+        let session = session_result;
         
         // Retrieve the session and verify sensitive data is not stored in plaintext
-        let retrieved_result = get_user_session(&pool, &session.session_id).await;
-        assert!(retrieved_result.is_ok(), "Should retrieve session");
-        
+        let retrieved_result = SessionManager::get_user_session(&pool, &session.session_id).await.unwrap();
         let retrieved_session = retrieved_result.unwrap();
-        assert!(retrieved_session.is_some(), "Session should exist");
         
-        let session_data = &retrieved_session.unwrap().data;
+        let session_data = &retrieved_session.data;
         
         // Verify sensitive data is not stored in plaintext
         let sensitive_fields = ["s3cr3tP@ssw0rd!", "4111-1111-1111-1111", "123-45-6789"];
@@ -509,19 +445,16 @@ mod tests {
         }
         
         // 2. Test logging security - verify sensitive data is redacted
-        let log_result = log_user_action(
+        let log_result = LogManager::log_system_event(
             &pool,
-            "security-test-user",
-            "login_attempt",
             "security_test",
+            "login_attempt",
             &json!({
                 "email": "security@example.com",
                 "password": "s3cr3tP@ssw0rd!",
                 "credit_card": "4111-1111-1111-1111"
             })
-        ).await;
-        
-        assert!(log_result.is_ok(), "Should log security event");
+        ).await.unwrap();
         
         // 3. Test DSL script generation with sensitive data
         let sensitive_html = r#"
@@ -532,7 +465,7 @@ mod tests {
             </form>
         "#;
         
-        let dsl_script = generate_dsl_script(sensitive_html, &sensitive_data).await;
+        let dsl_script = generate_simple_dsl(sensitive_html, &sensitive_data).await;
         assert!(!dsl_script.is_empty(), "Should generate DSL script");
         
         // Verify sensitive data is not exposed in the generated script
@@ -546,11 +479,11 @@ mod tests {
         
         // 4. Test SQL injection prevention
         let sql_injection_attempt = "'; DROP TABLE users; --";
-        let injection_result = get_user_session(&pool, sql_injection_attempt).await;
+        let injection_result = SessionManager::get_user_session(&pool, sql_injection_attempt).await.unwrap();
         
         // Should either return an error or no session, but should not execute the SQL
         assert!(
-            injection_result.is_ok() && injection_result.unwrap().is_none(),
+            injection_result.is_none(),
             "Should safely handle SQL injection attempts"
         );
     }

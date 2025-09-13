@@ -56,4 +56,14 @@ name = "codialog"
 path = "src/main.rs"
 
 [features]
+# Default has no extra tests enabled
 default = []
+# Backward compatibility (not used by Makefile)
+internal_tests = []
+# Granular test feature flags
+integration_tests = []
+tests_llm = []
+tests_logging = []
+tests_session = []
+tests_database = []
+tests_bitwarden = []
