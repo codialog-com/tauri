@@ -68,7 +68,7 @@ init_database() {
     # Wait for PostgreSQL to be ready
     print_status "Oczekiwanie na gotowość PostgreSQL..."
     for i in {1..30}; do
-        if docker exec codialog-postgres pg_isready -U ${POSTGRES_USER:-codialog} >/dev/null 2>&1; then
+        if docker exec codialog_postgres pg_isready -U ${POSTGRES_USER:-codialog} >/dev/null 2>&1; then
             break
         fi
         sleep 2
@@ -77,7 +77,7 @@ init_database() {
     # Run database migrations
     if [ -f "src-tauri/migrations/001_initial.sql" ]; then
         print_status "Wykonywanie migracji bazy danych..."
-        docker exec -i codialog-postgres psql -U ${POSTGRES_USER:-codialog} -d ${POSTGRES_DB:-codialog} < src-tauri/migrations/001_initial.sql
+        docker exec -i codialog_postgres psql -U ${POSTGRES_USER:-codialog} -d ${POSTGRES_DB:-codialog} < src-tauri/migrations/001_initial.sql
         print_status "Migracje bazy danych zakończone pomyślnie"
     else
         print_warning "Plik migracji nie został znaleziony, pomijam inicjalizację schematu"
@@ -89,18 +89,18 @@ start_bitwarden() {
     print_header "Uruchamianie Vaultwarden..."
     
     # Start Vaultwarden
-    docker-compose -f docker-compose.bitwarden.yml up -d vaultwarden
+    docker-compose -f docker-compose.bitwarden.yml up -d bitwarden
     
     # Wait for Vaultwarden to be ready
     print_status "Oczekiwanie na gotowość Vaultwarden..."
     for i in {1..30}; do
-        if curl -s http://localhost:${VAULTWARDEN_PORT:-8080}/alive >/dev/null 2>&1; then
+        if curl -s http://localhost:${VAULTWARDEN_PORT:-8081}/alive >/dev/null 2>&1; then
             break
         fi
         sleep 2
     done
     
-    print_status "Vaultwarden jest gotowy na porcie ${VAULTWARDEN_PORT:-8080}"
+    print_status "Vaultwarden jest gotowy na porcie ${VAULTWARDEN_PORT:-8081}"
 }
 
 # Start Redis
@@ -112,7 +112,7 @@ start_redis() {
     # Test Redis connection
     print_status "Testowanie połączenia z Redis..."
     for i in {1..15}; do
-        if docker exec codialog-redis redis-cli ping >/dev/null 2>&1; then
+        if docker exec codialog_redis redis-cli ping >/dev/null 2>&1; then
             break
         fi
         sleep 1
@@ -134,7 +134,7 @@ start_bitwarden_cli() {
 health_check() {
     print_header "Sprawdzanie stanu usług..."
     
-    services=("postgres" "redis" "vaultwarden" "bitwarden-cli")
+    services=("postgres" "redis" "bitwarden" "bitwarden-cli")
     
     for service in "${services[@]}"; do
         if docker-compose -f docker-compose.bitwarden.yml ps | grep -q "$service.*Up"; then
@@ -151,7 +151,7 @@ show_info() {
     
     echo ""
     print_status "🔗 Dostęp do usług:"
-    echo "  • Vaultwarden Web UI:    http://localhost:${VAULTWARDEN_PORT:-8080}"
+    echo "  • Vaultwarden Web UI:    http://localhost:${VAULTWARDEN_PORT:-8081}"
     echo "  • PostgreSQL:           localhost:${POSTGRES_PORT:-5432}"
     echo "  • Redis:                localhost:${REDIS_PORT:-6379}"
     echo "  • Codialog App:         http://localhost:1420 (po uruchomieniu)"
@@ -164,7 +164,7 @@ show_info() {
     echo ""
     
     print_status "📋 Następne kroki:"
-    echo "  1. Otwórz http://localhost:${VAULTWARDEN_PORT:-8080} i utwórz konto Bitwarden"
+    echo "  1. Otwórz http://localhost:${VAULTWARDEN_PORT:-8081} i utwórz konto Bitwarden"
     echo "  2. Uruchom aplikację Codialog: make dev"
     echo "  3. Zaloguj się do Bitwarden przez aplikację"
     echo ""
