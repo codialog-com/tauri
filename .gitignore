@@ -1,5 +1,7 @@
 .idea
 .vscode
+.pem
+.rdb
 package-lock.json
 venv
 .env
