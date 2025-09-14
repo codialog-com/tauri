@@ -687,11 +687,13 @@ fn main() {
             .route("/session/get", get(get_session))
             .with_state(state_clone);
 
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:4000")
+        let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", 
+            std::env::var("API_PORT").unwrap_or_else(|_| "4000".to_string())))
             .await
-            .expect("Failed to bind to port 4000");
+            .expect("Failed to bind to API port");
         
-        info!("HTTP server starting on http://127.0.0.1:4000");
+        info!("HTTP server starting on http://127.0.0.1:{}", 
+            std::env::var("API_PORT").unwrap_or_else(|_| "4000".to_string()));
         axum::serve(listener, app).await.expect("Failed to start HTTP server");
     });
 
